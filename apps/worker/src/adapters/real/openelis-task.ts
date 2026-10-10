@@ -1,6 +1,7 @@
 import { FhirClient, FhirProtocolError, type FhirResource } from './fhir-client';
 
 const referenceBase = 'https://hospital-fabric.example/synthetic-fhir/';
+const uuid = (value: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
 const orderSystem = 'https://hospital-fabric.example/synthetic-order';
 const id = (value: string) => /^[A-Za-z0-9.-]{1,64}$/.test(value) && value !== '.' && value !== '..';
 export type SyntheticLabRequest = {
@@ -10,6 +11,7 @@ export type SyntheticLabRequest = {
 };
 function validate(input: SyntheticLabRequest) {
   if (![input.taskId,input.requestId,input.patientId,input.ownerId].every(id) ||
+      !uuid(input.patientId) || !uuid(input.ownerId) ||
       !/^HF-SYNTH-[A-Za-z0-9.-]{1,64}$/.test(input.orderNumber) ||
       !/^HF-SYNTH-[A-Za-z0-9.-]{1,64}$/.test(input.patientIdentifier) ||
       !input.patientIdentifierSystem || /[|\s]/.test(input.patientIdentifierSystem) ||

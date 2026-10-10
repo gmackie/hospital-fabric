@@ -34,6 +34,8 @@ systemctl enable --now hospital-fabric-stack.service
 
 Ubuntu's installed Podman 3.4.4 API does not support the Compose `platform` field; the host overlay removes it and uses AMD64 digests. The installed `crun` fails cgroup initialization, so this API uses the installed working `runc`. Always use `compose.sh openmrs|openelis <arguments>` or the same explicit Podman root/runroot/runtime and `XDG_RUNTIME_DIR=/run/hospital-fabric/runtime` when inspecting this deployment.
 
+The OpenELIS proxy re-resolves its upstream names every ten seconds using the container nameserver, so a product restart can change its IP without leaving the proxy pointed at a stale address. Its generated Nginx configuration lives in `/tmp` because the image root is read-only.
+
 The upstream gateway assumes Docker DNS `127.0.0.11`; the wrapper uses the container's actual nameserver. Application volumes must be owned by UID 1001 for OpenMRS and private OpenELIS properties by UID 8443. Image-baked certificate defaults are replaced by a generated CA, server/client certificate and matching PKCS12 stores; the proxy verifies upstream TLS.
 
 ## Verification
@@ -55,14 +57,20 @@ python3 "$base/status.py"
 
 First OpenMRS startup imports the full upstream catalog. Thread samples showed OCL waiting for Lucene index commits; concept-map counts continued growing, distinguishing slow initialization from deadlock. Avoid repeated restarts during this import. Readiness requires an authenticated FHIR/REST response, not merely a running container or gateway UI.
 
+## Synthetic laboratory fixture
+
+Run `configure-lab.py` to map the installed active whole-blood hemoglobin test to LOINC `718-7` through authenticated catalog APIs, preserving other terminology. Run `lab-order.mjs` to stage one durable synthetic order, then rerun it to reconcile without resubmitting. The fixture/correlation record remains in `private/lab-order.json`. OpenELIS imports patient/provider references as UUIDs, so the adapter requires UUIDs for these references. The polling owner is a host-configured UUID Practitioner, not a display-name ID. Confirm exactly one Electronic Order through the application API before accession/result entry.
+
 ## Restart, TLS and persistence
 
-Restart this stack with `systemctl restart hospital-fabric-stack.service`; this reapplies validation and starts existing persistent containers. For an individual product use `compose.sh <product> restart`. Never use `down -v` or delete data as routine recovery. A host reboot recovery check and product restart/persistence check are required before claiming resilience.
+Restart this stack with `systemctl restart hospital-fabric-stack.service`; this reapplies validation and starts existing persistent containers. For an individual product use `compose.sh <product> restart`. Never use `down -v` or delete data as routine recovery. OpenELIS restart preserved the private administrator and catalog mapping. A host reboot recovery check and complete workflow restart/persistence check are still required before claiming resilience.
 
 Leaf TLS expires after 90 days; CA after 365 days. The provisioning marker prevents implicit regeneration, and startup refuses certificates within seven days of expiry. Rotation is currently manual: back up private files and keystores securely, stop dependent applications, replace the entire trust chain together, restart applications/proxy, and verify trusted HTTPS and private admin login. Do not delete just the marker on an existing installation; partial regeneration is rejected. Scheduled renewal and off-host backups remain follow-up work.
 
 ## Delivery limits
 
-HAPI metadata and trusted OpenELIS UI HTTPS have passed. Conditional creation/replay passed on HAPI 6.6.0. OpenELIS private administrator login and the actual adapter replay/reconciliation probe have also passed. OpenMRS readiness, synthetic registration, catalog mapping, Electronic Order acceptance, verified result return to OpenMRS, and a bounded public bridge each require explicit runtime evidence. A test writing Task `accepted` is transport conformance, not laboratory acceptance.
+HAPI metadata and trusted OpenELIS UI HTTPS have passed. Conditional creation/replay passed on HAPI 6.6.0. OpenELIS private administrator login and the actual adapter replay/reconciliation probe have also passed. The hemoglobin catalog mapping (LOINC `718-7`) is configured and one generated order is visible in Electronic Orders as `AwaitingSpecimen`. Its Task is `rejected`, and co-resident import logged a stale-version HTTP 409 while updating the same Task through source and local clients. These product states disagree; do not treat this as accepted or completed. The specimen-selection workflow and source/result topology need resolution before another order is sent.
+
+OpenMRS has completed the OCL imports and is still generating the distribution’s demo visits; patient/visit counts advance but authenticated readiness remains unverified. Synthetic registration, Electronic Order acceptance, verified result return to OpenMRS, and a bounded public bridge still require runtime evidence. A test writing Task `accepted` is transport conformance, not laboratory acceptance.
 
 HF-3 remains open until its workflow acceptance criteria pass. ForgeGraph has no enrolled `hospital-fabric` application, so deployment evidence/status synchronization is tracked separately in HF-2; GitHub merge alone must not close production work.

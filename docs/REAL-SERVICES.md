@@ -38,7 +38,7 @@ Use a dedicated synthetic-demo host with Docker Engine and Docker Compose 2.24.4
    ```
 
    Repeat in the full OpenELIS checkout with project `hf-openelis` and `openelis.private.yml`. Always pass the base filename explicitly so development overrides are not implicitly loaded. Do not save resolved config output: it contains passwords.
-6. OpenMRS is loopback port 8090; OpenELIS proxy ports 8092/8443; its HAPI FHIR store is loopback port 8091 with base `/fhir/`. No database host port is allowed. Confirm these paths against the running build. Use an authorized SSH port-forward for a remote host. Establish properly trusted TLS; do not bypass certificate warnings. Do not expose upstream defaults to the internet.
+6. OpenMRS is loopback port 8090; OpenELIS proxy ports 8092/8443; its HAPI FHIR store is loopback port 8091 with base `/fhir/`. No database host port is allowed. The `hetzner-master` host uses ports 18090/18091/18092/18443; confirm these paths against the running build. Use an authorized SSH port-forward for a remote host. Establish properly trusted TLS; do not bypass certificate warnings. Do not expose upstream defaults to the internet.
 7. Verify startup, rotate/default-disable all application access, and configure a narrowly scoped synthetic integration identity. Host deployment and synthetic credentials are authorized in this session. An upstream healthcheck alone is not proof of usable APIs.
 
 ## Architecture for the eventual connected demo

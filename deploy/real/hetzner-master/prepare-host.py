@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Prepare this authorized synthetic installation. Secrets are generated only on the host."""
-import json, os, pathlib, secrets, subprocess
+import json, os, pathlib, secrets, subprocess, uuid
 base=pathlib.Path('/mnt/master-apps/hospital-fabric')
 os.umask(0o077)
 def run(*args): subprocess.run(args,check=True)
@@ -22,10 +22,13 @@ if not secret_path.exists():
  values['OE_COMMON_PROPERTIES_FILE']=str(base/'private/common.properties')
  secret_path.write_text(''.join(f'{key}={value}\n' for key,value in values.items()))
 else: values=dict(line.split('=',1) for line in secret_path.read_text().splitlines())
+if 'OE_SYNTHETIC_OWNER_ID' not in values:
+ values['OE_SYNTHETIC_OWNER_ID']=str(uuid.uuid5(uuid.NAMESPACE_URL,'https://med.gmac.io/synthetic-lab'))
+ with secret_path.open('a') as handle: handle.write('OE_SYNTHETIC_OWNER_ID='+values['OE_SYNTHETIC_OWNER_ID']+'\n')
 properties=base/'private/common.properties'
 if not properties.exists():
  text=(base/'upstream/openelis/volume/properties/common.properties').read_text()
- replacements={'server.ssl.key-store-password':values['SSL_KEYSTORE_PASSWORD'],'server.ssl.key-password':values['SSL_KEYSTORE_PASSWORD'],'server.ssl.trust-store-password':values['SSL_TRUSTSTORE_PASSWORD'],'encryption.general.password':values['OE_ENCRYPTION_PASSWORD'],'org.openelisglobal.fhirstore.uri':'http://fhir.openelis.org:8080/fhir/','org.openelisglobal.remote.source.uri':'http://fhir.openelis.org:8080/fhir/','org.openelisglobal.remote.source.identifier':'Practitioner/hf-synthetic-lab','org.openelisglobal.fhir.subscriber':''}
+ replacements={'server.ssl.key-store-password':values['SSL_KEYSTORE_PASSWORD'],'server.ssl.key-password':values['SSL_KEYSTORE_PASSWORD'],'server.ssl.trust-store-password':values['SSL_TRUSTSTORE_PASSWORD'],'encryption.general.password':values['OE_ENCRYPTION_PASSWORD'],'org.openelisglobal.fhirstore.uri':'http://fhir.openelis.org:8080/fhir/','org.openelisglobal.remote.source.uri':'http://fhir.openelis.org:8080/fhir/','org.openelisglobal.remote.source.identifier':'Practitioner/'+values['OE_SYNTHETIC_OWNER_ID'],'org.openelisglobal.fhir.subscriber':''}
  lines=[]
  for line in text.splitlines():
   key=line.split('=',1)[0].strip()

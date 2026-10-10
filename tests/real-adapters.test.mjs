@@ -4,7 +4,7 @@ import {test} from 'node:test';
 import {build} from 'esbuild';
 const bundle = await build({stdin:{contents:`export * from './apps/worker/src/adapters/real/fhir-client'; export * from './apps/worker/src/adapters/real/openmrs'; export * from './apps/worker/src/adapters/real/openelis-task';`,resolveDir:process.cwd()},bundle:true,format:'esm',platform:'neutral',write:false});
 const {FhirClient,readSyntheticOpenMrsPatient,buildOpenElisTaskTransaction,inspectOpenElisTask,stageOpenElisTask,reconcileOpenElisTask} = await import(`data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text).toString('base64')}`);
-const input={taskId:'task-1',requestId:'request-1',patientId:'patient-1',ownerId:'lab-1',patientIdentifierSystem:'http://openelis-global.org/pat_nationalId',patientIdentifier:'HF-SYNTH-patient-1',orderNumber:'HF-SYNTH-order-1',loincCode:'53225-9',authoredOn:'2026-10-10T22:00:00Z'};
+const input={taskId:'task-1',requestId:'request-1',patientId:'11111111-1111-4111-8111-111111111111',ownerId:'22222222-2222-4222-8222-222222222222',patientIdentifierSystem:'http://openelis-global.org/pat_nationalId',patientIdentifier:'HF-SYNTH-patient-1',orderNumber:'HF-SYNTH-order-1',loincCode:'53225-9',authoredOn:'2026-10-10T22:00:00Z'};
 const json=(value,status=200)=>new Response(JSON.stringify(value),{status,headers:{'content-type':'application/fhir+json'}});
 const client=(fn)=>new FhirClient({baseUrl:'http://127.0.0.1:8090/fhir',authorization:'Basic test-only',fetch:fn});
 const resources=()=>{const [request,task]=buildOpenElisTaskTransaction(input).entry.map(x=>structuredClone(x.resource)); request.id=input.requestId;task.id=input.taskId;task.basedOn=[{reference:'ServiceRequest/'+input.requestId}];return [request,task];};
@@ -40,7 +40,7 @@ test('OpenMRS rejects fuzzy, duplicate and paginated identity matches',async()=>
 test('transaction conditionally creates by stable order identifier and resolves bundle references',()=>{
  const tx=buildOpenElisTaskTransaction(input);assert.equal(tx.type,'transaction');assert.equal(tx.entry.length,2);
  assert.ok(tx.entry.every(x=>x.request.method==='POST' && x.request.ifNoneExist==='identifier='+encodeURIComponent('https://hospital-fabric.example/synthetic-order|'+input.orderNumber)));assert.equal(tx.entry[1].resource.basedOn[0].reference,tx.entry[0].fullUrl);assert.ok(tx.entry.every(x=>!x.resource.id));assert.equal(tx.entry[1].resource.status,'requested');
- assert.equal(tx.entry[1].resource.owner.reference,'Practitioner/lab-1');assert.equal(tx.entry[0].resource.identifier[0].value,input.orderNumber);
+ assert.equal(tx.entry[1].resource.owner.reference,'Practitioner/'+input.ownerId);assert.equal(tx.entry[0].resource.identifier[0].value,input.orderNumber);
  assert.throws(()=>buildOpenElisTaskTransaction({...input,orderNumber:'clinical-order'}));
 });
 test('store creation is awaiting laboratory, never accepted',async()=>{
@@ -107,4 +107,8 @@ test('lost receipts reconcile by stable order identifier and validate accepted c
  const c=client(async url=>{assert.equal(url.searchParams.get('identifier')??'https://hospital-fabric.example/synthetic-order|'+input.orderNumber,'https://hospital-fabric.example/synthetic-order|'+input.orderNumber);const resource=url.pathname.includes('/Task')?task:request;return json(url.search?{resourceType:'Bundle',total:1,entry:[{resource}]}:resource);});
  assert.deepEqual(await reconcileOpenElisTask(c,input),{state:'accepted',reportReferences:[],taskId:'assigned-task',requestId:'assigned-request'});
  await assert.rejects(reconcileOpenElisTask(client(async()=>json({resourceType:'Bundle',total:2,entry:[{resource:request},{resource:request}]})),input),/exactly one/);
+});
+
+test('OpenELIS patient/provider references require product-compatible UUIDs',()=>{
+ for(const change of [{patientId:'patient-not-uuid'},{ownerId:'lab-not-uuid'}])assert.throws(()=>buildOpenElisTaskTransaction({...input,...change}),/Invalid synthetic/);
 });

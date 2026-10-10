@@ -29,11 +29,14 @@ services:
     platform: !reset null
     container_name: hf-openelis-frontend
   proxy:
+    entrypoint: ["/bin/sh", "/hf-proxy.sh"]
+    command: []
     platform: !reset null
     container_name: hf-openelis-proxy
     depends_on: !override [certs, oe.openelis.org, frontend.openelis.org]
     volumes:
-      - /mnt/master-apps/hospital-fabric/release/deploy/real/hetzner-master/nginx.conf:/etc/nginx/nginx.conf:ro
+      - /mnt/master-apps/hospital-fabric/release/deploy/real/hetzner-master/nginx.conf:/hf-nginx.conf:ro
+      - /mnt/master-apps/hospital-fabric/release/deploy/real/hetzner-master/openelis-proxy.sh:/hf-proxy.sh:ro
       - /mnt/master-apps/hospital-fabric/private/ca.crt:/etc/nginx/hf-ca.crt:ro
     ports: !override ["127.0.0.1:18092:80", "127.0.0.1:18443:443"]
 networks:
