@@ -1,0 +1,14 @@
+[Unit]
+Description=Hospital Fabric private OpenMRS and OpenELIS stack
+Requires=hospital-fabric-podman-api.service
+After=hospital-fabric-podman-api.service network-online.target
+RequiresMountsFor=/mnt/master-apps/hospital-fabric
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+TimeoutStartSec=900
+ExecStart=/bin/bash /mnt/master-apps/hospital-fabric/release/deploy/real/hetzner-master/start.sh
+
+[Install]
+WantedBy=multi-user.target

@@ -1,5 +1,6 @@
 import { FhirClient, FhirProtocolError, type FhirResource } from './fhir-client';
 
+const referenceBase = 'https://hospital-fabric.example/synthetic-fhir/';
 const orderSystem = 'https://hospital-fabric.example/synthetic-order';
 const id = (value: string) => /^[A-Za-z0-9.-]{1,64}$/.test(value) && value !== '.' && value !== '..';
 export type SyntheticLabRequest = {
@@ -21,20 +22,21 @@ export function buildOpenElisTaskTransaction(input: SyntheticLabRequest): FhirRe
   validate(input);
   const patient = {reference: `Patient/${input.patientId}`};
   const serviceRequest: FhirResource = {
-    resourceType: 'ServiceRequest', id: input.requestId,
+    resourceType: 'ServiceRequest',
     identifier: [{system: orderSystem, value: input.orderNumber}],
     status: 'active', intent: 'order', priority: 'routine',
     code: {coding: [{system:'http://loinc.org',code:input.loincCode}]}, subject: patient,
     authoredOn: input.authoredOn,
   };
   const task: FhirResource = {
-    resourceType: 'Task', id: input.taskId,
+    resourceType: 'Task',
     identifier: [{system: orderSystem, value: input.orderNumber}],
     status:'requested', intent:'order', owner:{reference:`Practitioner/${input.ownerId}`},
-    basedOn:[{reference:`ServiceRequest/${input.requestId}`}], for:patient, authoredOn:input.authoredOn,
+    basedOn:[{reference:`${referenceBase}ServiceRequest/${input.requestId}`}], for:patient, authoredOn:input.authoredOn,
   };
   return {resourceType:'Bundle', type:'transaction', entry:[serviceRequest,task].map(resource => ({
-    resource, request:{method:'PUT',url:`${resource.resourceType}/${resource.id}`,ifNoneMatch:'*'},
+    fullUrl: `${referenceBase}${resource.resourceType}/${resource.resourceType === 'Task' ? input.taskId : input.requestId}`,
+    resource, request:{method:'POST',url:resource.resourceType,ifNoneExist:`identifier=${encodeURIComponent(orderSystem + '|' + input.orderNumber)}`},
   }))};
 }
 
@@ -70,9 +72,9 @@ export async function inspectOpenElisTask(client: FhirClient, input: SyntheticLa
 }
 
 /** Explicitly gated: run only after the pinned server passes create-only transaction conformance. */
-export async function stageOpenElisTask(client: FhirClient, input: SyntheticLabRequest, options: {createOnlyTransactionsVerified: boolean}) {
+export async function stageOpenElisTask(client: FhirClient, input: SyntheticLabRequest, options: {conditionalCreateTransactionsVerified: boolean}) {
   validate(input);
-  if (!options.createOnlyTransactionsVerified) throw new FhirProtocolError('Create-only transaction conformance has not been verified');
+  if (!options.conditionalCreateTransactionsVerified) throw new FhirProtocolError('Conditional-create transaction conformance has not been verified');
   const patient = await client.request(`Patient/${input.patientId}`, 'Patient');
   const identifiers = patient.identifier as Array<{system?:string;value?:string;type?:{coding?:Array<{system?:string;code?:string}>}}> | undefined;
   const supportedIdentifier = Array.isArray(identifiers) && identifiers.every(item => /^HF-SYNTH-[A-Za-z0-9.-]{1,64}$/.test(item.value ?? '')) && identifiers.some(item => item.system === input.patientIdentifierSystem && item.value === input.patientIdentifier && (
@@ -84,11 +86,39 @@ export async function stageOpenElisTask(client: FhirClient, input: SyntheticLabR
     throw new FhirProtocolError('Patient does not satisfy the synthetic OpenELIS identity profile');
   }
   const result = await client.request('', 'Bundle', {method:'POST',body:buildOpenElisTaskTransaction(input)});
-  const entries = result.entry as Array<{response?:{status?:string}}> | undefined;
+  const entries = result.entry as Array<{response?:{status?:string;location?:string}}> | undefined;
   if (result.type !== 'transaction-response' || !Array.isArray(entries) || entries.length !== 2 ||
       entries.some(entry => !/^201(?: |$)/.test(entry.response?.status ?? ''))) {
     throw new FhirProtocolError('Creation not confirmed; inspect remote Task before any retry');
   }
+  const assignedId = (index: number, type: string) => {
+    // Require relative receipts to avoid trusting arbitrary upstream origins.
+    const match = entries[index]?.response?.location?.match(new RegExp(`^${type}/([A-Za-z0-9.-]{1,64})(?:/_history/[A-Za-z0-9.-]+)?$`));
+    if (!match || !id(match[1] ?? '')) throw new FhirProtocolError('Missing creation receipt; reconcile by synthetic order identifier');
+    return match[1]!;
+  };
+  const requestId = assignedId(0, 'ServiceRequest');
+  const taskId = assignedId(1, 'Task');
+  // Persist these server-assigned IDs with the stable order identifier before proceeding.
   // Even HTTP 201 does not establish that OpenELIS imported or accepted an order.
-  return {state:'awaiting_lab' as const, taskId:input.taskId};
+  return {state:'awaiting_lab' as const, taskId, requestId};
+}
+
+/** Recover server-assigned IDs after a lost receipt without submitting another order. */
+export async function reconcileOpenElisTask(client: FhirClient, input: SyntheticLabRequest) {
+  validate(input);
+  const assigned: Record<string, string> = {};
+  for (const type of ['ServiceRequest', 'Task']) {
+    const result = await client.request(`${type}?identifier=${encodeURIComponent(orderSystem + '|' + input.orderNumber)}`, 'Bundle');
+    const entries = result.entry as Array<{resource?: FhirResource}> | undefined;
+    const links = result.link as Array<{relation?: string}> | undefined;
+    const resource = entries?.[0]?.resource;
+    if (result.total !== 1 || !Array.isArray(entries) || entries.length !== 1 || links?.some(link => link.relation === 'next') ||
+        resource?.resourceType !== type || !id(String(resource.id ?? ''))) {
+      throw new FhirProtocolError('Synthetic order reconciliation requires exactly one matching request and Task');
+    }
+    assigned[type] = String(resource!.id);
+  }
+  const correlated = {...input, requestId: assigned.ServiceRequest!, taskId: assigned.Task!};
+  return {...await inspectOpenElisTask(client, correlated), requestId: correlated.requestId, taskId: correlated.taskId};
 }

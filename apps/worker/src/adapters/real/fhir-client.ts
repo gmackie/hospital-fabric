@@ -50,7 +50,7 @@ export class FhirClient {
       while (true) {
         const chunk = await reader.read(); if (chunk.done) break;
         length += chunk.value.byteLength;
-        if (length > 1_048_576) { await reader.cancel(); throw new FhirProtocolError('FHIR response exceeded size limit'); }
+        if (length > (resourceType === 'CapabilityStatement' ? 4_194_304 : 1_048_576)) { await reader.cancel(); throw new FhirProtocolError('FHIR response exceeded size limit'); }
         chunks.push(chunk.value);
       }
     } catch (error) {
