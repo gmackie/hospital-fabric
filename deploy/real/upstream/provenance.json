@@ -1,0 +1,78 @@
+{
+  "retrievedAt": "2026-10-10",
+  "warning": "Source references only; upstream content is not vendored. Full upstream release checkouts are required. OpenELIS release compose still references mutable develop images; registry tags/digests remain unverified. Never expose upstream public default credentials.",
+  "files": [
+    {
+      "file": "openmrs-3.7.1/docker-compose.yml",
+      "source": "https://github.com/openmrs/openmrs-distro-referenceapplication/blob/3.7.1/docker-compose.yml",
+      "ref": "3.7.1",
+      "blobSha": "ccebec281baaa03cc65ff7ffd6f2f2a18b62a9ae"
+    },
+    {
+      "file": "openelis-3.2.3.0/docker-compose.yml",
+      "source": "https://github.com/DIGI-UW/OpenELIS-Global-2/blob/3.2.3.0/docker-compose.yml",
+      "ref": "3.2.3.0",
+      "blobSha": "46dbcbcf6eec5edbaf89dc0bef519c6b84807e68"
+    },
+    {
+      "file": "openelis-3.2.3.0/volume/properties/common.properties",
+      "source": "https://github.com/DIGI-UW/OpenELIS-Global-2/blob/3.2.3.0/volume/properties/common.properties",
+      "ref": "3.2.3.0",
+      "blobSha": "993e9fb8bdb278f4a266fe40962c2f8090a47739"
+    },
+    {
+      "file": "openelis-3.2.3.0/volume/properties/SystemConfiguration.properties",
+      "source": "https://github.com/DIGI-UW/OpenELIS-Global-2/blob/3.2.3.0/volume/properties/SystemConfiguration.properties",
+      "ref": "3.2.3.0",
+      "blobSha": "b349c9966e5c264f975fec9c3949ded40d0cd868"
+    },
+    {
+      "file": "openelis-3.2.3.0/volume/database/database.env",
+      "source": "https://github.com/DIGI-UW/OpenELIS-Global-2/blob/3.2.3.0/volume/database/database.env",
+      "ref": "3.2.3.0",
+      "blobSha": "c798426f927c4d5921aa9de74a008207c8d9f076"
+    },
+    {
+      "file": "openelis-3.2.3.0/volume/nginx/nginx-prod.conf",
+      "source": "https://github.com/DIGI-UW/OpenELIS-Global-2/blob/3.2.3.0/volume/nginx/nginx-prod.conf",
+      "ref": "3.2.3.0",
+      "blobSha": "5ce3609aa3e35db4245c9220b8233a9935e26976"
+    },
+    {
+      "file": "openelis-3.2.3.0/volume/analyzer/analyzer-test-map.csv",
+      "source": "https://github.com/DIGI-UW/OpenELIS-Global-2/blob/3.2.3.0/volume/analyzer/analyzer-test-map.csv",
+      "ref": "3.2.3.0",
+      "blobSha": "fd899312a336558b542f73a74137a23dfd6f0330"
+    },
+    {
+      "file": "openelis-3.2.3.0/volume/odoo/odoo-test-product-mapping.csv",
+      "source": "https://github.com/DIGI-UW/OpenELIS-Global-2/blob/3.2.3.0/volume/odoo/odoo-test-product-mapping.csv",
+      "ref": "3.2.3.0",
+      "blobSha": "18e6b68f2c97d4deb6ac128a7c485d0fbcd3953c"
+    },
+    {
+      "file": "reference/openelis-workflows.md",
+      "source": "https://github.com/DIGI-UW/openelis-global2-fhir-ig/blob/main/input/pagecontent/workflows.md",
+      "ref": "main at retrieval",
+      "blobSha": "e5117b1b467573e82cf0412a15ded96238d2ff3d"
+    },
+    {
+      "file": "reference/openelis-api.md",
+      "source": "https://github.com/DIGI-UW/openelis-global2-fhir-ig/blob/main/input/pagecontent/api.md",
+      "ref": "main at retrieval",
+      "blobSha": "eb7734cd0d9cd5ccb03205656b8605e464201584"
+    },
+    {
+      "file": "reference/openelis-known-issues.md",
+      "source": "https://github.com/DIGI-UW/openelis-global2-fhir-ig/blob/main/input/pagecontent/known-issues.md",
+      "ref": "main at retrieval",
+      "blobSha": "1a2fdbc276779f3ce98822855379d658ac7f3c2b"
+    },
+    {
+      "file": "reference/openelis-examples.fsh",
+      "source": "https://github.com/DIGI-UW/openelis-global2-fhir-ig/blob/main/input/fsh/20-examples-order-result.fsh",
+      "ref": "main at retrieval",
+      "blobSha": "304c801e910f70b7dd3a9eb3737c1eaf1d96ad48"
+    }
+  ]
+}

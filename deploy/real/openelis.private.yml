@@ -1,0 +1,30 @@
+# Docker Compose 2.24.4+; apply AFTER official 3.2.3.0 compose in FULL upstream checkout.
+services:
+  certs:
+    image: ${OE_CERTGEN_IMAGE:?Set a verified image digest}
+    environment:
+      KEYSTORE_PW: ${SSL_KEYSTORE_PASSWORD:?Set a private keystore password}
+      TRUSTSTORE_PW: ${SSL_TRUSTSTORE_PASSWORD:?Set a private truststore password}
+  db.openelis.org:
+    image: ${OE_DATABASE_IMAGE:?Set a verified image digest}
+    ports: !reset []
+    environment:
+      POSTGRES_PASSWORD: ${OE_POSTGRES_PASSWORD:?Set a private database owner password}
+      DB_PASSWORD: ${OE_DB_PASSWORD:?Set a private app database password}
+      DB_SUPERUSER_PASSWORD: ${ADMIN_PASSWORD:?Set a private database admin password}
+  oe.openelis.org:
+    image: ${OE_APP_IMAGE:?Set a verified image digest}
+    ports: !reset []
+    environment:
+      DEFAULT_PW: ${OE_ADMIN_PASSWORD:?Set a private initial admin password}
+  fhir.openelis.org:
+    image: ${OE_FHIR_IMAGE:?Set a verified image digest}
+    ports: !override ["127.0.0.1:8091:8080"]
+  frontend.openelis.org:
+    image: ${OE_FRONTEND_IMAGE:?Set a verified image digest}
+  proxy:
+    image: ${OE_PROXY_IMAGE:?Set a verified image digest}
+    ports: !override ["127.0.0.1:8092:80", "127.0.0.1:8443:443"]
+secrets:
+  common.properties:
+    file: ${OE_COMMON_PROPERTIES_FILE:?Set absolute path to reviewed private properties file}

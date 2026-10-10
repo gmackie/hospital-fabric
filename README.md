@@ -10,6 +10,10 @@ The first slice demonstrates durable order delivery between a synthetic OpenMRS-
 
 The public interactive synthetic walkthrough is hosted at [med.gmac.io](https://med.gmac.io) on Cloudflare Workers with two independent D1 databases. It demonstrates order delivery, a lost acknowledgment, reconciliation, and result import. No token is needed for that isolated public walkthrough. The token-based operator console in this PR is served only when `PUBLIC_DEMO` is not enabled and is not deployed by this change. See [cloud deployment and verification](docs/CLOUD-DEMO.md).
 
+## Real-service integration preparation
+
+Private OpenMRS/OpenELIS deployment overlays, read-only probes and guarded FHIR protocol clients are prepared in [the real-services guide](docs/REAL-SERVICES.md). They are not enabled in the public demo and have not been tested against running product instances. That guide records the exact deployment and end-to-end gates before enabling a real synthetic workflow.
+
 ## Prerequisites
 
 - Node.js 22.16+ (Effect 4 uses TS >= 5.9; build is ES2022)

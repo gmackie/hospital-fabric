@@ -18,7 +18,9 @@
     "build:console": "node scripts/build-console.mjs",
     "test:console": "npm run build && playwright test",
     "dev:demo": "npm run build && wrangler dev --config apps/worker/wrangler.demo.jsonc --local",
-    "deploy:demo": "npm run build && wrangler d1 migrations apply DB --config apps/worker/wrangler.demo.jsonc --remote && wrangler d1 migrations apply LIS_DB --config apps/worker/wrangler.demo.jsonc --remote && wrangler deploy --config apps/worker/wrangler.demo.jsonc"
+    "deploy:demo": "npm run build && wrangler d1 migrations apply DB --config apps/worker/wrangler.demo.jsonc --remote && wrangler d1 migrations apply LIS_DB --config apps/worker/wrangler.demo.jsonc --remote && wrangler deploy --config apps/worker/wrangler.demo.jsonc",
+    "test:real-contracts": "node --test tests/real-adapters.test.mjs",
+    "probe:real": "node scripts/probe-real-services.mjs"
   },
   "dependencies": {
     "effect": "4.0.2",
