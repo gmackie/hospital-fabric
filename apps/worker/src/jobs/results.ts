@@ -6,10 +6,11 @@ type RemoteResult = {
 };
 
 /** Simulated LIS result intake. This is NOT a clinical result validation pipeline. */
-export async function pollResults(env: Env, limit=25) {
+export async function pollResults(env: Env, limit=25, idempotencyKey?: string) {
   const remote = await env.LIS_DB.prepare(`SELECT r.*,o.idempotency_key,o.patient_id,o.test_code
     FROM lis_results r JOIN lis_orders o ON o.id=r.lis_order_id
-    ORDER BY r.released_at LIMIT ?`).bind(limit).all<RemoteResult>();
+    WHERE (? IS NULL OR o.idempotency_key=?)
+    ORDER BY r.released_at LIMIT ?`).bind(idempotencyKey??null,idempotencyKey??null,limit).all<RemoteResult>();
   let processed = 0, skipped = 0, quarantined = 0;
   for (const result of remote.results) {
     const existing = await env.DB.prepare('SELECT payload_hash FROM inbox WHERE source_system=? AND dedupe_key=?')

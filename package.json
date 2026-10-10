@@ -2,7 +2,9 @@
   "name": "hospital-fabric",
   "private": true,
   "type": "module",
-  "engines": { "node": ">=22.16.0" },
+  "engines": {
+    "node": ">=22.16.0"
+  },
   "scripts": {
     "build": "node scripts/embed-migrations.mjs && esbuild apps/worker/src/index.ts --bundle --format=esm --platform=browser --target=es2022 --outfile=apps/worker/dist/index.mjs",
     "dev:secrets": "node scripts/create-dev-vars.mjs",
@@ -12,9 +14,13 @@
     "smoke:workerd": "npm run build && npm run dev:secrets && node scripts/smoke-workerd.mjs",
     "test": "npm run build && node --experimental-sqlite --test tests/*.test.mjs",
     "check:sql": "python3 scripts/check-sql.py",
-    "check": "npm run check:sql && npm run typecheck && npm test"
+    "check": "npm run check:sql && npm run typecheck && npm test",
+    "dev:demo": "npm run build && wrangler dev --config apps/worker/wrangler.demo.jsonc --local",
+    "deploy:demo": "npm run build && wrangler d1 migrations apply DB --config apps/worker/wrangler.demo.jsonc --remote && wrangler d1 migrations apply LIS_DB --config apps/worker/wrangler.demo.jsonc --remote && wrangler deploy --config apps/worker/wrangler.demo.jsonc"
   },
-  "dependencies": { "effect": "4.0.2" },
+  "dependencies": {
+    "effect": "4.0.2"
+  },
   "devDependencies": {
     "@types/node": "^22.15.0",
     "esbuild": "^0.25.0",
