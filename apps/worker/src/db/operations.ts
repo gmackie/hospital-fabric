@@ -70,21 +70,21 @@ export const createLabOrder = (env: Env, input: LabOrderInput) => Effect.gen(fun
       .bind(id(),facility,'demo-operator','synthetic_lab_order.created','operation',opId,at),
   ];
   // Atomic batch: operation + outbox + audit either all exist or none do.
-  const result = yield* Effect.either(Effect.tryPromise({
+  const result = yield* Effect.result(Effect.tryPromise({
     try: () => env.DB.batch(statements),
     catch: (cause) => new ApiError(500, 'db_error', String(cause)),
   }));
-  if (result._tag === 'Left') {
+  if (result._tag === 'Failure') {
     // Concurrent duplicate request: reread and preserve first-write-wins.
     const existing = yield* Effect.tryPromise({
       try: () => env.DB.prepare('SELECT id,payload_hash FROM integration_operations WHERE idempotency_key=?').bind(key).first<{id:string;payload_hash:string}>(),
-      catch: () => result.left,
+      catch: () => result.failure,
     });
     if (existing) {
       if (existing.payload_hash !== hash) return yield* Effect.fail(new ApiError(409, 'idempotency_collision', 'Conflicting reuse of requestId'));
       return {operationId: existing.id, duplicated: true, synthetic: true};
     }
-    return yield* Effect.fail(result.left);
+    return yield* Effect.fail(result.failure);
   }
   return {operationId:opId, duplicated:false, synthetic:true};
 });

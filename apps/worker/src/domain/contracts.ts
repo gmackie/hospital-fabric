@@ -6,7 +6,7 @@ export const PatientInputSchema = Schema.Struct({
 });
 export const LabOrderInputSchema = Schema.Struct({
   patientId: Schema.String,
-  testCode: Schema.Literal('CBC', 'BMP', 'GLUCOSE'),
+  testCode: Schema.Literals(['CBC', 'BMP', 'GLUCOSE']),
   requestId: Schema.String,
 });
 export const ReleaseResultSchema = Schema.Struct({

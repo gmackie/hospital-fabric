@@ -80,6 +80,76 @@ test('auth + input validation + clinical idempotency',async()=>{
   } finally {env.DB.close();env.LIS_DB.close();}
 });
 
+test('Effect 4 schema accepts every supported test code and rejects unknown codes',async()=>{
+  const {env,call}=await initialize();
+  try {
+    const p=await call('POST','/v1/demo/patients',{label:'SYNTHETIC-SCHEMA'});
+    for (const testCode of ['CBC','BMP','GLUCOSE']) {
+      const response=await call('POST','/v1/demo/lab-orders',{
+        patientId:p.body.id,testCode,requestId:`schema-${testCode}-001`,
+      });
+      assert.equal(response.status,201,JSON.stringify(response));
+    }
+    for (const testCode of ['UNKNOWN','cbc',null,42]) {
+      const response=await call('POST','/v1/demo/lab-orders',{
+        patientId:p.body.id,testCode,requestId:'schema-invalid-001',
+      });
+      assert.equal(response.status,400,JSON.stringify(response));
+    }
+    const missing=await call('POST','/v1/demo/lab-orders',{
+      patientId:'missing-synthetic-patient',testCode:'CBC',requestId:'schema-missing-001',
+    });
+    assert.equal(missing.status,404,JSON.stringify(missing));
+  } finally {env.DB.close();env.LIS_DB.close();}
+});
+
+test('Effect 4 failure results preserve concurrent duplicate recovery and database errors',async()=>{
+  const {env,call}=await initialize();
+  try {
+    const p=await call('POST','/v1/demo/patients',{label:'SYNTHETIC-CONCURRENT'});
+    const input={patientId:p.body.id,testCode:'CBC',requestId:'concurrent-request-001'};
+    // Hold both inserts until both requests have read that no prior operation exists.
+    const batch=env.DB.batch.bind(env.DB);
+    let arrived=0;
+    let release;
+    const gate=new Promise(resolve=>{release=resolve;});
+    env.DB.batch=async statements=>{
+      if (++arrived===2) release();
+      await gate;
+      return batch(statements);
+    };
+    const responses=await Promise.all([
+      call('POST','/v1/demo/lab-orders',input),
+      call('POST','/v1/demo/lab-orders',input),
+    ]);
+    assert.deepEqual(responses.map(r=>r.status).sort(),[200,201]);
+    assert.equal(responses[0].body.operationId,responses[1].body.operationId);
+    assert.equal((await env.DB.prepare('SELECT count(*) AS n FROM outbox').first()).n,1);
+    env.DB.batch=async()=>{throw new Error('Injected database failure');};
+    const failed=await call('POST','/v1/demo/lab-orders',{...input,requestId:'database-failure-001'});
+    assert.equal(failed.status,500,JSON.stringify(failed));
+    assert.equal(failed.body.code,'db_error');
+    assert.equal((await env.DB.prepare('SELECT count(*) AS n FROM integration_operations').first()).n,1);
+  } finally {env.DB.close();env.LIS_DB.close();}
+});
+
+test('Effect 4 dispatch failure routes conflicting destination state to manual review',async()=>{
+  const {env,call}=await initialize();
+  try {
+    const p=await call('POST','/v1/demo/patients',{label:'SYNTHETIC-CONFLICT'});
+    const order=await call('POST','/v1/demo/lab-orders',{
+      patientId:p.body.id,testCode:'CBC',requestId:'destination-conflict-001',
+    });
+    await call('POST','/v1/demo/faults/drop-next-ack');
+    await call('POST','/v1/admin/tick');
+    await env.LIS_DB.prepare('UPDATE lis_orders SET payload_hash=?').bind('injected-conflict').run();
+    const reconciled=await call('POST',`/v1/operations/${order.body.operationId}/reconcile`);
+    assert.equal(reconciled.body.attempts[0].state,'needs_review',JSON.stringify(reconciled));
+    assert.equal((await env.DB.prepare('SELECT state FROM outbox').first()).state,'blocked');
+    assert.equal((await env.LIS_DB.prepare('SELECT count(*) AS n FROM lis_orders').first()).n,1);
+  } finally {env.DB.close();env.LIS_DB.close();}
+});
+
 test('lost ACK + simulated Worker restart -> remote lookup, no duplicate',async()=>{
   const {env,call}=await initialize();
   try {

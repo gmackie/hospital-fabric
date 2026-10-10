@@ -77,9 +77,9 @@ export async function serve(request:Request,env:Env):Promise<Response> {
     if (method==='POST' && path==='/v1/demo/lab-orders') {
       requireDemoBootstrap(env);
       const input = await decodeOrder(await bodyJson(request)).catch(() => {throw new ApiError(400,'invalid_input','Invalid synthetic laboratory order')});
-      const result = await Effect.runPromise(Effect.either(createLabOrder(env,input)));
-      if (result._tag==='Left') throw result.left;
-      return json(result.right,result.right.duplicated?200:201);
+      const result = await Effect.runPromise(Effect.result(createLabOrder(env,input)));
+      if (result._tag==='Failure') throw result.failure;
+      return json(result.success,result.success.duplicated?200:201);
     }
     if (method==='POST' && path==='/v1/demo/faults/drop-next-ack') {
       requireDemoBootstrap(env);

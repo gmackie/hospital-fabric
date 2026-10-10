@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import assert from 'node:assert/strict';
 const base=process.env.HOSPITAL_URL ?? 'http://127.0.0.1:9876';
 const devVars=readFileSync('apps/worker/.dev.vars','utf8');
 const secret=devVars.match(/^DEMO_API_KEY=(.+)$/m)?.[1]?.trim();
@@ -22,14 +23,21 @@ console.log('Patient registered:',patient.id);
 console.log('Order queued:',created.operationId);
 await request('POST','/v1/demo/faults/drop-next-ack');
 console.log('Fault armed: next simulated LIS response will be lost after commit.');
-console.log('First dispatch:',JSON.stringify(await request('POST','/v1/admin/tick')));
+const firstDispatch=await request('POST','/v1/admin/tick');
+console.log('First dispatch:',JSON.stringify(firstDispatch));
+assert.equal(firstDispatch.dispatched[0].state,'outcome_unknown');
 console.log('State:',(await request('GET',`/v1/operations/${created.operationId}`)).operation.state);
-console.log('Recovery:',JSON.stringify(await request('POST',`/v1/operations/${created.operationId}/reconcile`)));
+const recovery=await request('POST',`/v1/operations/${created.operationId}/reconcile`);
+console.log('Recovery:',JSON.stringify(recovery));
+assert.equal(recovery.attempts[0].state,'accepted');
 await request('POST',`/v1/demo/lis/orders/${created.operationId}/release`,{
   resultText:'SYNTHETIC: 7.5',unitCode:'10^9/L',
 });
 await request('POST','/v1/admin/tick');
 const patientResults=await request('GET',`/v1/demo/patients/${patient.id}/results`);
 console.log('Simulated chart results:',JSON.stringify(patientResults,null,2));
+assert.equal(patientResults.results.length,1);
+assert.equal(patientResults.results[0].simulated,1);
 const op=await request('GET',`/v1/operations/${created.operationId}`);
 console.log('Final operation state:',op.operation.state);
+assert.equal(op.operation.state,'completed');

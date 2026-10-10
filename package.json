@@ -9,6 +9,7 @@
     "dev:celld": "npm run build && celld dev apps/worker",
     "dev:workerd": "npm run build && wrangler dev --config apps/worker/wrangler.jsonc --local",
     "typecheck": "tsc --noEmit",
+    "smoke:workerd": "npm run build && npm run dev:secrets && node scripts/smoke-workerd.mjs",
     "test": "npm run build && node --experimental-sqlite --test tests/*.test.mjs",
     "check:sql": "python3 scripts/check-sql.py",
     "check": "npm run check:sql && npm run typecheck && npm test"

@@ -97,7 +97,7 @@ async function blocked(env: Env,item: Pending,error: unknown) {
 export const dispatchOnce = (env: Env) => Effect.gen(function* () {
   const item = yield* Effect.promise(() => claim(env));
   if (!item) return { ran: false, state: 'empty' };
-  const attempt = yield* Effect.either(Effect.tryPromise({
+  const attempt = yield* Effect.result(Effect.tryPromise({
     try: async () => {
       // Reconcile before sending: prior attempts may have committed remotely.
       const adapter = simulatedLisAdapter(env);
@@ -114,8 +114,8 @@ export const dispatchOnce = (env: Env) => Effect.gen(function* () {
     },
     catch: (cause) => cause,
   }));
-  if (attempt._tag === 'Right') return { ran:true, state:'accepted', operationId:item.operation_id };
-  const error = attempt.left;
+  if (attempt._tag === 'Success') return { ran:true, state:'accepted', operationId:item.operation_id };
+  const error = attempt.failure;
   if (error instanceof ReconciliationRequired) {
     yield* Effect.promise(() => blocked(env, item, error));
     return { ran:true, state:'needs_review', operationId:item.operation_id };
