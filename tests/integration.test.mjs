@@ -252,3 +252,102 @@ test('static console has no secrets, stays local and does not bypass API authent
     assert.equal((await call('POST','/v1/demo/patients',{label:'SYNTHETIC-DISABLED'})).status,403);
   } finally {env.DB.close();env.LIS_DB.close();}
 });
+
+test('public walkthrough isolates visitors, rejects cross-origin writes and delivers exactly once',async()=>{
+  const {env}=await initialize();
+  env.PUBLIC_DEMO='1';env.ALLOW_DEV_BOOTSTRAP='0';
+  const worker=(await import('../apps/worker/dist/index.mjs')).default;
+  const browser=()=>({cookie:''});
+  const a=browser(),b=browser();
+  const call=async(visitor,path,method='GET',origin='https://med.gmac.io')=>{
+    const response=await worker.fetch(new Request('https://med.gmac.io'+path,{method,headers:{cookie:visitor.cookie,origin}}),env);
+    if(response.headers.has('set-cookie'))visitor.cookie=response.headers.get('set-cookie').split(';')[0];
+    return {status:response.status,body:await response.json()};
+  };
+  try {
+    assert.equal((await call(a,'/demo/api/start','POST','https://evil.example')).status,403);
+    assert.equal((await call(a,'/v1/operations')).status,401);
+    await call(a,'/demo/api/start','POST');await call(b,'/demo/api/start','POST');
+    const aId=(await call(a,'/demo/api/state')).body.operation.id;
+    const bId=(await call(b,'/demo/api/state')).body.operation.id;
+    assert.notEqual(aId,bId);
+    await call(a,'/demo/api/start','POST');
+    assert.equal((await call(a,'/demo/api/state')).body.operation.id,aId);
+    const delivered=await call(a,'/demo/api/deliver','POST');
+    assert.equal(delivered.body.operation.state,'outcome_unknown');
+    assert.equal(delivered.body.remoteOrder,true);
+    assert.equal((await call(b,'/demo/api/state')).body.operation.state,'queued');
+    await call(a,'/demo/api/reconcile','POST');
+    assert.equal((await call(a,'/demo/api/state')).body.operation.state,'accepted');
+    // Older reports must not starve this visitor after the general 25-report batch fills.
+    for(let i=0;i<26;i++) {
+      env.LIS_DB.sqlite.prepare('INSERT INTO lis_orders(id,idempotency_key,patient_id,test_code,payload_hash,created_at) VALUES(?,?,?,?,?,0)').run('old-'+i,'old-key-'+i,'old-patient','CBC','old-hash');
+      env.LIS_DB.sqlite.prepare('INSERT INTO lis_results(id,lis_order_id,report_id,result_text,unit_code,released_at) VALUES(?,?,?,?,?,0)').run('old-result-'+i,'old-'+i,'old-report-'+i,'SYNTHETIC','unit');
+    }
+    await call(a,'/demo/api/result','POST');await call(a,'/demo/api/result','POST');
+    const done=(await call(a,'/demo/api/state')).body;
+    assert.equal(done.operation.state,'completed');assert.equal(done.results.length,1);
+    assert.equal((await env.LIS_DB.prepare("SELECT count(*) n FROM lis_orders WHERE id NOT LIKE 'old-%'").first()).n,1);
+    env.DEMO_RATE_LIMITER={limit:async()=>({success:false})};
+    assert.equal((await call(a,'/demo/api/state')).status,429);
+  } finally {env.DB.close();env.LIS_DB.close();}
+});
+
+test('public demo mode preserves its walkthrough and denies local-console assets',async()=>{
+  const {env,call}=await initialize();
+  const worker=(await import('../apps/worker/dist/index.mjs')).default;
+  try {
+    env.PUBLIC_DEMO='1';
+    env.ALLOW_DEV_BOOTSTRAP='0';
+    const root=await worker.fetch(new Request('https://med.gmac.io/'),env);
+    assert.equal(root.status,200);
+    const html=await root.text();
+    assert.match(html,/Your integration walkthrough/);
+    assert.doesNotMatch(html,/\/console\.js|Local demo token/);
+    for (const path of ['/console.js','/console.css']) {
+      for (const headers of [{},{'x-demo-token':env.DEMO_API_KEY}]) {
+        const response=await worker.fetch(new Request('https://med.gmac.io'+path,{headers}),env);
+        assert.equal(response.status,404);
+        assert.doesNotMatch(await response.text(),/Local demo token|Register synthetic patient/);
+      }
+    }
+    assert.equal((await call('GET','/v1/operations',undefined,false)).status,401);
+    assert.equal((await call('POST','/v1/admin/bootstrap')).status,403);
+  } finally {env.DB.close();env.LIS_DB.close();}
+});
+
+test('public walkthrough recovers crashed dispatching leases without stealing active claims',async()=>{
+  const {env}=await initialize();
+  const worker=(await import('../apps/worker/dist/index.mjs')).default;
+  env.PUBLIC_DEMO='1';env.ALLOW_DEV_BOOTSTRAP='0';
+  let cookie='';
+  const call=async(path,method='POST')=>{
+    const response=await worker.fetch(new Request('https://med.gmac.io/demo/api/'+path,{
+      method,headers:{cookie,origin:'https://med.gmac.io'},
+    }),env);
+    if(response.headers.has('set-cookie'))cookie=response.headers.get('set-cookie').split(';')[0];
+    assert.equal(response.status,200);
+    return response.json();
+  };
+  try {
+    await call('start');
+    const lost=await call('deliver');
+    const id=lost.operation.id;
+    assert.equal(lost.operation.state,'outcome_unknown');
+    // Model a crash during a later reconciliation claim, preserving the committed LIS order.
+    await env.DB.prepare("UPDATE integration_operations SET state='dispatching' WHERE id=?").bind(id).run();
+    await env.DB.prepare("UPDATE outbox SET state='processing',lease_token='crashed-claim',lease_until=? WHERE operation_id=?")
+      .bind(Date.now()+60000,id).run();
+    const active=await call('reconcile');
+    assert.equal(active.operation.state,'dispatching','An active lease must not be stolen');
+    assert.equal(active.operation.attempts,lost.operation.attempts);
+    await env.DB.prepare('UPDATE outbox SET lease_until=0 WHERE operation_id=?').bind(id).run();
+    const recovered=await call('reconcile');
+    assert.equal(recovered.operation.state,'accepted');
+    assert.equal(recovered.operation.attempts,lost.operation.attempts+1);
+    assert.equal((await env.LIS_DB.prepare('SELECT count(*) n FROM lis_orders').first()).n,1);
+    assert.equal(recovered.events.filter(e=>e.event_type==='delivery.reconciled').length,1);
+    const page=await worker.fetch(new Request('https://med.gmac.io/'),env);
+    assert.match(await page.text(),/Check delivery recovery/);
+  } finally {env.DB.close();env.LIS_DB.close();}
+});

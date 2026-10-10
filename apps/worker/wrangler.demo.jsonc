@@ -1,0 +1,16 @@
+{
+  "name": "hospital-fabric-demo",
+  "account_id": "c07a7e704db1808e1fff91bed2b1cd49",
+  "main": "dist/index.mjs",
+  "compatibility_date": "2026-10-01",
+  "workers_dev": false,
+  "routes": [{ "pattern": "med.gmac.io", "custom_domain": true }],
+  "vars": { "PUBLIC_DEMO": "1", "ALLOW_DEV_BOOTSTRAP": "0" },
+  "d1_databases": [
+    { "binding": "DB", "database_name": "hospital-fabric-demo-core", "database_id": "8ea92814-a899-43e5-a014-99b5642c57d7", "migrations_dir": "migrations/core" },
+    { "binding": "LIS_DB", "database_name": "hospital-fabric-demo-lis", "database_id": "1e7f81e5-45d9-4653-b270-65dd8140dcb5", "migrations_dir": "migrations/sim_lis" }
+  ],
+  "ratelimits": [{ "name": "DEMO_RATE_LIMITER", "namespace_id": "1001", "simple": { "limit": 60, "period": 60 } }],
+  "triggers": { "crons": ["* * * * *"] },
+  "observability": { "enabled": true }
+}

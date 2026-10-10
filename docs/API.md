@@ -6,7 +6,7 @@ All `v1` endpoints in this repository are **synthetic/demo-only**, require `x-de
 
 | Method | Path | Description |
 |---|---|---|
-| GET | `/`, `/console.js`, `/console.css` | Public static demo console; no embedded token or data; all data/actions still require API authentication |
+| GET | `/`, `/console.js`, `/console.css` | Local-mode static demo console; no embedded token or data; all data/actions still require API authentication. Assets disabled with PUBLIC_DEMO=1 |
 | GET | `/healthz` | No DB check; public liveness |
 | GET | `/readyz` | Both D1 databases reachable; authenticated |
 | POST | `/v1/admin/bootstrap` | Apply embedded migrations; local-dev gated |

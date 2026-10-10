@@ -39,7 +39,7 @@ export async function sendOrder(env: Env, data: {
   const remote = await findRemoteOrder(env, data.key);
   if (!remote) throw new RemoteOutcomeUnknown('LIS write outcome unknown after insert');
   const fault = await env.DB.prepare(`UPDATE demo_faults SET remaining=remaining-1
-    WHERE name='drop_next_ack' AND remaining>0 RETURNING remaining`).first<{remaining:number}>();
+    WHERE name IN ('drop_next_ack', ?) AND remaining>0 RETURNING remaining`).bind(`drop_ack:${data.key}`).first<{remaining:number}>();
   if (fault) throw new RemoteOutcomeUnknown('INJECTED: remote persisted the order but its acknowledgment was dropped');
   return remote;
 }

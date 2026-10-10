@@ -1,3 +1,5 @@
+import { publicDemo } from '../demo/api';
+import { demoPage } from '../demo/page';
 import { Effect } from 'effect';
 import type { Env } from '../db/types';
 import { ApiError } from '../domain/errors';
@@ -7,7 +9,7 @@ import { releaseSimulatedResult } from '../adapters/lis-simulator';
 import { runDispatchBatch, reconcileOperation } from '../jobs/dispatch';
 import { pollResults } from '../jobs/results';
 import { CONSOLE_HTML, CONSOLE_JS, CONSOLE_CSS } from '../generated/console';
-import { CORE_MIGRATION, OPERATIONS_MIGRATION, LIS_MIGRATION } from '../generated/migrations';
+import { CORE_MIGRATION, OPERATIONS_MIGRATION, PUBLIC_DEMO_MIGRATION, LIS_MIGRATION } from '../generated/migrations';
 
 const json = (body: unknown,status=200) => Response.json(body,{status,headers:{'cache-control':'no-store'}});
 const noStore = { 'cache-control':'no-store' };
@@ -41,7 +43,8 @@ export async function serve(request:Request,env:Env):Promise<Response> {
   const asset = path==='/' ? [CONSOLE_HTML,'text/html; charset=utf-8'] :
     path==='/console.js' ? [CONSOLE_JS,'text/javascript; charset=utf-8'] :
     path==='/console.css' ? [CONSOLE_CSS,'text/css; charset=utf-8'] : null;
-  if (method==='GET' && asset) return new Response(asset[0], {headers:{
+  if (env.PUBLIC_DEMO==='1' && (path==='/console.js' || path==='/console.css')) return json({code:'not_found'},404);
+  if (env.PUBLIC_DEMO!=='1' && method==='GET' && asset) return new Response(asset[0], {headers:{
     'content-type':asset[1]!, 'cache-control':'no-store', 'x-content-type-options':'nosniff',
     'referrer-policy':'no-referrer',
     'content-security-policy':"default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'",
@@ -49,12 +52,15 @@ export async function serve(request:Request,env:Env):Promise<Response> {
   if (method==='GET' && path==='/healthz') return json({ok:true,service:'hospital-fabric',mode:'synthetic-only'});
   if (method==='OPTIONS') return new Response(null,{status:204,headers:noStore});
   try {
+    if (env.PUBLIC_DEMO==='1' && method==='GET' && path==='/') return demoPage();
+    if (env.PUBLIC_DEMO==='1' && path.startsWith('/demo/api/')) return await publicDemo(request,env);
     requireAuth(request,env);
     if (method==='POST' && path==='/v1/admin/bootstrap') {
       requireDemoBootstrap(env);
       // For local prototype only; fleet migrations use 'celld d1 migrations apply'.
       await env.DB.exec(CORE_MIGRATION);
       await env.DB.exec(OPERATIONS_MIGRATION);
+      await env.DB.exec(PUBLIC_DEMO_MIGRATION);
       await env.LIS_DB.exec(LIS_MIGRATION);
       return json({ready:true,syntheticOnly:true,warning:'Prototype bootstrapped. Not a clinical system.'});
     }

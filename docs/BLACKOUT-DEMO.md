@@ -32,6 +32,8 @@ npm run dev:workerd -- --port 9876
 
 Open http://127.0.0.1:9876 in your browser. Copy the generated `DEMO_API_KEY` from `apps/worker/.dev.vars` into the console. The token is held in tab memory only; disconnect or reload clears it. Keep the server bound to loopback. The demo token is not production identity, access control or network protection.
 
+When `PUBLIC_DEMO=1`, the existing public walkthrough owns `/` and the operator console assets return 404, even with a demo token. This change does not deploy the local console.
+
 The console and React runtime are bundled into the Worker and served from the same origin, without a CDN or remote fonts. A fresh browser load requires the local Worker to be running. There is no service-worker cache, browser-side offline write queue or browser database.
 
 Connect, bootstrap the synthetic databases if needed, register a synthetic patient and queue a CBC. Arm the lost-ACK fault before running the delivery tick. Inspect the selected operation and its history, then reconcile it. Reconciliation only attempts that selected operation; it cannot dispatch unrelated queued work. The destination is always looked up before a resend. Release a synthetic result after acceptance, then run the delivery/result tick to import it.
