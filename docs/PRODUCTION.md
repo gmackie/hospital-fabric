@@ -17,7 +17,7 @@
 
 M1: Exact modern OpenMRS adapter and API capability declaration.
 M2: OpenELIS Global adapter with FHIR R4 ServiceRequest/Task/DiagnosticReport mapping and safe identifier correlation.
-M3: Operator console and supervised exception resolution.
+M3: Production operator console and supervised exception resolution. A synthetic-only local React console now demonstrates the existing simulator workflow; real identity, clinical exception resolution and production audit remain unimplemented.
 M4: Orthanc/OHIF DICOM order-to-study matching.
 M5: OpenBoxes pharmacy/stock integration and verified lot movements.
 M6: Medical-device compatibility passport and isolated serial/HL7/ASTM gateways.

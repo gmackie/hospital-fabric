@@ -16,9 +16,13 @@ jobs:
       - name: Validate SQLite migrations
         run: python scripts/check-sql.py
       - name: Install dependencies
-        run: npm install --no-audit --no-fund
+        run: npm ci --no-audit --no-fund
       - name: Typecheck, bundle and synthetic fault tests
         run: npm run check
       - name: Smoke test local Wrangler/workerd and D1
         run: npm run smoke:workerd
+      - name: Install console test browser
+        run: npx playwright install --with-deps chromium
+      - name: Test operator console in Chromium
+        run: npm run test:console
       # Follow-up: install pinned forgec, run forgec check forge, and add an actual celld smoke test.

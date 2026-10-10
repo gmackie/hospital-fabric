@@ -194,3 +194,61 @@ test('lost ACK + simulated Worker restart -> remote lookup, no duplicate',async(
     assert.equal((await call('GET',`/v1/operations/${id}`)).body.operation.state,'completed');
   } finally {env.DB.close();env.LIS_DB.close();}
 });
+
+test('selected reconciliation never dispatches unrelated pending work and records recovery history',async()=>{
+  const {env,call}=await initialize();
+  try {
+    const p=await call('POST','/v1/demo/patients',{label:'SYNTHETIC-TARGETED'});
+    const order=await call('POST','/v1/demo/lab-orders',{
+      patientId:p.body.id,testCode:'CBC',requestId:'targeted-request-001',
+    });
+    const id=order.body.operationId;
+    await call('POST','/v1/demo/faults/drop-next-ack');
+    await call('POST','/v1/admin/tick');
+    const other=await call('POST','/v1/demo/lab-orders',{
+      patientId:p.body.id,testCode:'BMP',requestId:'unrelated-request-001',
+    });
+    // Make the unrelated order older so a generic sweep would choose it first.
+    await env.DB.prepare('UPDATE outbox SET created_at=0 WHERE operation_id=?').bind(other.body.operationId).run();
+    const response=await call('POST',`/v1/operations/${id}/reconcile`);
+    assert.equal(response.status,200);
+    assert.equal(response.body.attempts.length,1);
+    assert.equal(response.body.attempts[0].operationId,id);
+    assert.equal((await call('GET',`/v1/operations/${other.body.operationId}`)).body.operation.state,'queued');
+    assert.equal((await env.LIS_DB.prepare('SELECT count(*) AS n FROM lis_orders').first()).n,1);
+    const timeline=(await call('GET',`/v1/operations/${id}/events`)).body.events;
+    assert.deepEqual(timeline.map(e=>e.event_type),[
+      'order.queued','delivery.attempt_started','delivery.lookup_started','delivery.lookup_completed',
+      'delivery.submit_started','order.outcome_unknown','delivery.attempt_started','delivery.lookup_started',
+      'delivery.lookup_completed','delivery.reconciled','order.accepted',
+    ]);
+    assert.deepEqual(timeline.filter(e=>e.event_type==='delivery.lookup_completed').map(e=>JSON.parse(e.details_json).found),[false,true]);
+    assert.equal((await call('POST',`/v1/operations/${id}/reconcile`)).status,409);
+    assert.equal((await call('POST','/v1/operations/missing/reconcile')).status,404);
+  } finally {env.DB.close();env.LIS_DB.close();}
+});
+
+test('static console has no secrets, stays local and does not bypass API authentication',async()=>{
+  const {env,call}=await initialize();
+  const worker=(await import('../apps/worker/dist/index.mjs')).default;
+  try {
+    for (const path of ['/','/console.js','/console.css']) {
+      const response=await worker.fetch(new Request('http://127.0.0.1:9876'+path),env);
+      assert.equal(response.status,200);
+      assert.equal(response.headers.get('cache-control'),'no-store');
+      assert.equal(response.headers.get('x-content-type-options'),'nosniff');
+      assert.match(response.headers.get('content-security-policy'),/connect-src 'self'/);
+      const text=await response.text();
+      assert.ok(text.length>0);
+      assert.ok(!text.includes(env.DEMO_API_KEY));
+      if(path==='/') {
+        assert.match(text,/\/console.js/);
+        assert.doesNotMatch(text,/<script[^>]+src=["']https?:/);
+      }
+    }
+    assert.equal((await call('GET','/v1/operations',undefined,false)).status,401);
+    env.ALLOW_DEV_BOOTSTRAP='0';
+    assert.equal((await call('POST','/v1/admin/tick')).status,403);
+    assert.equal((await call('POST','/v1/demo/patients',{label:'SYNTHETIC-DISABLED'})).status,403);
+  } finally {env.DB.close();env.LIS_DB.close();}
+});

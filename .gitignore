@@ -8,3 +8,7 @@ apps/worker/.env.local
 *.db
 *.sqlite
 .DS_Store
+
+apps/worker/src/generated/console.ts
+test-results/
+playwright-report/

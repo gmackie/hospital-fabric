@@ -2,12 +2,14 @@
 
 **Runnable synthetic integration scaffold. Not a medical device, clinical EMR, validated LIS, or production-ready healthcare deployment. Do not process real patient data.**
 
+The prototype includes a bundled React operator console and a real workerd restart/recovery acceptance harness. See [the blackout demo guide](docs/BLACKOUT-DEMO.md) for the interactive workflow and boundaries.
+
 The first slice demonstrates durable order delivery between a synthetic OpenMRS-like order source and an independently persisted simulated LIS. Both data stores are SQLite-backed D1 bindings. This code doesn't run real OpenMRS or OpenELIS; those remain future adapters and separate clinical applications.
 
 ## Prerequisites
 
 - Node.js 22.16+ (Effect 4 uses TS >= 5.9; build is ES2022)
-- `npm install` with network access **before** moving into an air-gapped site (Effect 4 pinned to 4.0.2)
+- `npm ci` with network access **before** moving into an air-gapped site (Effect 4 pinned to 4.0.2)
 - Install [celld](https://celld.dev/docs/) or Wrangler (`npm install` adds local Wrangler) 
 - Local workstation; no internet needed at runtime once dependencies and binary are installed
 
@@ -16,7 +18,7 @@ The first slice demonstrates durable order delivery between a synthetic OpenMRS-
 In terminal A, at the project root:
 
 ```bash
-npm install
+npm ci
 npm run dev:secrets
 npm run build
 celld dev apps/worker
@@ -78,14 +80,14 @@ Read [API plan](docs/API.md), [database model](docs/DB.md), [Forge ownership](do
 
 ## What's *not* implemented
 
-No working OpenMRS, OpenELIS, Orthanc or OpenBoxes adapters; no FHIR/HL7/DICOM gateway; no live authentication/RBAC/ABAC; no operational UI; no encrypted clinical audit storage; no multi-node recovery validation; no medical-device integration; no actual clinical use. See `docs/PRODUCTION.md` before making any production claims.
+No working OpenMRS, OpenELIS, Orthanc or OpenBoxes adapters; no FHIR/HL7/DICOM gateway; no live authentication/RBAC/ABAC; no encrypted clinical audit storage; no multi-node recovery validation; no medical-device integration; no actual clinical use. See `docs/PRODUCTION.md` before making any production claims.
 
 ## Repository ownership and Forge
 
-This is intended to live at `gmackie/hospital-fabric` (GitHub repository must be created separately). Forge's maintained compiler repository is `gmackie/forgec`. The draft Forge operational model lives in `forge/`; it is not yet wired to the executable manual SQLite schema. See [Forge boundaries](docs/FORGE-BOUNDARIES.md) to avoid two owners for the same tables.
+This application lives at `gmackie/hospital-fabric`. Forge's maintained compiler repository is `gmackie/forgec`. The draft Forge operational model lives in `forge/`; it is not yet wired to the executable manual SQLite schema. See [Forge boundaries](docs/FORGE-BOUNDARIES.md) to avoid two owners for the same tables.
 
 ## Verification status
 
-`npm run check` passes SQLite integrity checks, the Effect 4.0.2 typecheck, bundling, and five synthetic integration tests. GitHub Actions also runs `npm run smoke:workerd`: it starts Wrangler locally with two D1 bindings and verifies bootstrap, lost-acknowledgment reconciliation, result import, and the final completed operation state. The D1 mock follows workerd's line-oriented `exec` behavior so malformed bootstrap SQL is caught in the integration tests.
+`npm run check` passes SQLite integrity checks, the Effect 4.0.2 typecheck, bundling, and the synthetic integration tests. GitHub Actions also runs `npm run smoke:workerd`: it starts Wrangler locally with two D1 bindings, loses a committed LIS acknowledgment, kills and restarts the runtime using the same persisted databases, reconciles by stable ID, and verifies exactly one LIS order/result plus the final completed operation state. Console Chromium tests cover the synthetic flow and interrupted/repeated interactions. The D1 mock follows workerd's line-oriented `exec` behavior so malformed bootstrap SQL is caught in the integration tests.
 
-The `celld` runtime smoke test and `forgec check forge` remain outstanding. Workerd validation does not establish celld compatibility or clinical suitability. Nothing has been deployed; do not use real patient data.
+The `celld` runtime smoke test, physical WAN-disconnection exercise and `forgec check forge` remain outstanding. Workerd validation does not establish celld compatibility or clinical suitability. Nothing has been deployed; do not use real patient data.
