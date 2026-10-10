@@ -40,9 +40,10 @@ For workerd compatibility: `npm run dev:workerd` starts Wrangler locally with th
 python3 scripts/check-sql.py
 npm test
 npm run typecheck
+npm run smoke:workerd
 ```
 
-Node's built-in experimental SQLite (`node --experimental-sqlite`) powers the test D1 mock, so there is no externally hosted test database. The test validates duplicate orders, idempotency collisions, the simulated lost ACK, a new isolate importing the same compiled Worker, safe reconciliation, and result deduplication. The tests are **synthetic** and do not certify a clinical workflow or the production celld runtime.
+Node's built-in experimental SQLite (`node --experimental-sqlite`) powers the test D1 mock, so there is no externally hosted test database. The tests validate supported and invalid lab codes, database failures, concurrent duplicate recovery, conflicting destination state, duplicate orders, idempotency collisions, the simulated lost ACK, a new isolate importing the same compiled Worker, safe reconciliation, and result deduplication. The tests are **synthetic** and do not certify a clinical workflow or the production celld runtime.
 
 ## Files
 
@@ -85,4 +86,4 @@ This is intended to live at `gmackie/hospital-fabric` (GitHub repository must be
 
 ## Verification status
 
-SQLite migrations have been checked with Python's built-in SQLite engine. Full Effect bundle/typecheck and celld/workerd runtime tests require installed npm dependencies and runtimes; they have **not** been run in the packaging environment. Do not interpret this scaffold as a deployed or validated clinical system.
+`npm run check` passes SQLite integrity checks, the Effect 4.0.2 typecheck, bundling, and five synthetic integration tests. GitHub Actions also runs `npm run smoke:workerd`: it starts Wrangler locally with two D1 bindings and verifies bootstrap, lost-acknowledgment reconciliation, result import, and the final completed operation state. The D1 mock follows workerd's line-oriented `exec` behavior so malformed bootstrap SQL is caught in the integration tests.\n\nThe `celld` runtime smoke test and `forgec check forge` remain outstanding. Workerd validation does not establish celld compatibility or clinical suitability. Nothing has been deployed; do not use real patient data.
