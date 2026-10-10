@@ -1,0 +1,75 @@
+/// DRAFT Forge model for general-purpose facility operations metadata.
+/// It is NOT wired to the current manual SQLite migrations. Do not deploy both
+/// schemas to one database until a migration/ownership plan is verified.
+
+enum FacilityProfile {
+  Clinic = "clinic"
+  Hospital = "hospital"
+  FieldHospital = "field-hospital"
+}
+
+enum ComponentKind {
+  Emr = "emr"
+  Lis = "lis"
+  Pacs = "pacs"
+  Pharmacy = "pharmacy"
+  Inventory = "inventory"
+  Gateway = "gateway"
+  Other = "other"
+}
+
+enum DeviceReadiness {
+  BenchOnly = "bench-only"
+  Quarantined = "quarantined"
+  Inspected = "inspected"
+  Authorized = "authorized-for-use"
+}
+
+/// A configuration/deployment boundary. Patient records remain in the EMR.
+export resource Facility
+  @timestamps @versioned @audited
+  @crud("/v1/facilities")
+{
+  id : id
+  code : text length 1..80 @immutable @unique
+  name : text length 1..160
+  profile : FacilityProfile
+  enabled : boolean = true
+
+  find by code
+  list by profile
+    order by name asc
+}
+
+/// Installed hospital software is registered by its capabilities, not trusted
+/// merely because it labels an endpoint "FHIR".
+export resource ComponentInstance
+  @timestamps @versioned @audited
+  @crud("/v1/components")
+{
+  id : id
+  facility : Facility
+  kind : ComponentKind
+  product : text length 1..160
+  releaseVersion : text? length <= 80
+  enabled : boolean = false
+
+  list by facility
+    order by createdAt desc
+}
+
+/// Nonclinical asset metadata; never an authority for clinical acceptability.
+export resource DevicePassport
+  @timestamps @versioned @audited
+  @crud("/v1/devices")
+{
+  id : id
+  facility : Facility
+  model : text length 1..120
+  manufacturer : text? length <= 120
+  serialFingerprint : text? length <= 128
+  readiness : DeviceReadiness = DeviceReadiness.BenchOnly
+
+  list by facility
+    order by createdAt desc
+}

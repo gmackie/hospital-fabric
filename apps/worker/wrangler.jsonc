@@ -1,0 +1,20 @@
+{
+  "name": "hospital-fabric",
+  "main": "dist/index.mjs",
+  "compatibility_date": "2026-10-01",
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "hospital_fabric",
+      "database_id": "00000000-0000-0000-0000-000000000001",
+      "migrations_dir": "migrations/core"
+    },
+    {
+      "binding": "LIS_DB",
+      "database_name": "hospital_sim_lis",
+      "database_id": "00000000-0000-0000-0000-000000000002",
+      "migrations_dir": "migrations/sim_lis"
+    }
+  ],
+  "triggers": { "crons": ["* * * * *"] }
+}
