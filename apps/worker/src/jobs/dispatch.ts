@@ -15,11 +15,13 @@ const selectDue = `SELECT b.id,b.operation_id,b.state,b.attempts,b.lease_token,
   JOIN demo_lab_orders d ON d.operation_id=o.id
   WHERE ((b.state IN ('pending','retry','uncertain') AND b.available_at<=?)
     OR (b.state='processing' AND b.lease_until<=?))
+  AND (? IS NULL OR b.operation_id=?)
+  AND (? IS NOT NULL OR NOT EXISTS(SELECT 1 FROM public_demo_sessions s WHERE s.operation_id=b.operation_id))
   ORDER BY b.created_at LIMIT 1`;
 
-async function claim(env: Env): Promise<Pending | null> {
+async function claim(env: Env, operationId?: string): Promise<Pending | null> {
   const at = Date.now();
-  const due = await env.DB.prepare(selectDue).bind(at,at).first<Pending>();
+  const due = await env.DB.prepare(selectDue).bind(at,at,operationId??null,operationId??null,operationId??null).first<Pending>();
   if (!due) return null;
   const token = crypto.randomUUID();
   const leaseUntil = at + 30_000;
@@ -94,8 +96,8 @@ async function blocked(env: Env,item: Pending,error: unknown) {
   ]);
 }
 
-export const dispatchOnce = (env: Env) => Effect.gen(function* () {
-  const item = yield* Effect.promise(() => claim(env));
+export const dispatchOnce = (env: Env, operationId?: string) => Effect.gen(function* () {
+  const item = yield* Effect.promise(() => claim(env, operationId));
   if (!item) return { ran: false, state: 'empty' };
   const attempt = yield* Effect.result(Effect.tryPromise({
     try: async () => {
@@ -125,10 +127,10 @@ export const dispatchOnce = (env: Env) => Effect.gen(function* () {
 });
 
 /** Prefer a small bounded sweep. The cron and admin endpoint share the same safe claim logic. */
-export async function runDispatchBatch(env: Env, limit=10) {
+export async function runDispatchBatch(env: Env, limit=10, operationId?: string) {
   const outcomes: Array<{ran:boolean;state:string;operationId?:string}> = [];
   for (let i=0;i<limit;i++) {
-    const result = await Effect.runPromise(dispatchOnce(env));
+    const result = await Effect.runPromise(dispatchOnce(env, operationId));
     if (!result.ran) break;
     outcomes.push(result);
     // Expose uncertain outcomes for inspection; do not retry them in this same sweep.

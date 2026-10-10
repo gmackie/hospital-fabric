@@ -19,6 +19,8 @@ export interface D1Database {
 export interface Env {
   DB: D1Database;
   LIS_DB: D1Database;
+  PUBLIC_DEMO?: string;
+  DEMO_RATE_LIMITER?: { limit(input: { key: string }): Promise<{ success: boolean }> };
   DEMO_API_KEY?: string;
   ALLOW_DEV_BOOTSTRAP?: string;
 }

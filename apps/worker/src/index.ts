@@ -9,7 +9,7 @@ export default {
   async scheduled(_controller:unknown,env:Env) {
     // Periodic sweep is a safety net: it recovers work after node restarts.
     // Do not depend on in-memory timers in the isolate.
-    if (!env.DEMO_API_KEY) return; // This scaffold is not enabled for production workloads.
+    if (!env.DEMO_API_KEY && env.PUBLIC_DEMO!=='1') return; // This scaffold is not enabled for production workloads.
     try {
       await runDispatchBatch(env,10);
       await pollResults(env,25);

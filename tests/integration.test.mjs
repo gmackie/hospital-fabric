@@ -194,3 +194,43 @@ test('lost ACK + simulated Worker restart -> remote lookup, no duplicate',async(
     assert.equal((await call('GET',`/v1/operations/${id}`)).body.operation.state,'completed');
   } finally {env.DB.close();env.LIS_DB.close();}
 });
+
+test('public walkthrough isolates visitors, rejects cross-origin writes and delivers exactly once',async()=>{
+  const {env}=await initialize();
+  env.PUBLIC_DEMO='1';env.ALLOW_DEV_BOOTSTRAP='0';
+  const worker=(await import('../apps/worker/dist/index.mjs')).default;
+  const browser=()=>({cookie:''});
+  const a=browser(),b=browser();
+  const call=async(visitor,path,method='GET',origin='https://med.gmac.io')=>{
+    const response=await worker.fetch(new Request('https://med.gmac.io'+path,{method,headers:{cookie:visitor.cookie,origin}}),env);
+    if(response.headers.has('set-cookie'))visitor.cookie=response.headers.get('set-cookie').split(';')[0];
+    return {status:response.status,body:await response.json()};
+  };
+  try {
+    assert.equal((await call(a,'/demo/api/start','POST','https://evil.example')).status,403);
+    assert.equal((await call(a,'/v1/operations')).status,401);
+    await call(a,'/demo/api/start','POST');await call(b,'/demo/api/start','POST');
+    const aId=(await call(a,'/demo/api/state')).body.operation.id;
+    const bId=(await call(b,'/demo/api/state')).body.operation.id;
+    assert.notEqual(aId,bId);
+    await call(a,'/demo/api/start','POST');
+    assert.equal((await call(a,'/demo/api/state')).body.operation.id,aId);
+    const delivered=await call(a,'/demo/api/deliver','POST');
+    assert.equal(delivered.body.operation.state,'outcome_unknown');
+    assert.equal(delivered.body.remoteOrder,true);
+    assert.equal((await call(b,'/demo/api/state')).body.operation.state,'queued');
+    await call(a,'/demo/api/reconcile','POST');
+    assert.equal((await call(a,'/demo/api/state')).body.operation.state,'accepted');
+    // Older reports must not starve this visitor after the general 25-report batch fills.
+    for(let i=0;i<26;i++) {
+      env.LIS_DB.sqlite.prepare('INSERT INTO lis_orders(id,idempotency_key,patient_id,test_code,payload_hash,created_at) VALUES(?,?,?,?,?,0)').run('old-'+i,'old-key-'+i,'old-patient','CBC','old-hash');
+      env.LIS_DB.sqlite.prepare('INSERT INTO lis_results(id,lis_order_id,report_id,result_text,unit_code,released_at) VALUES(?,?,?,?,?,0)').run('old-result-'+i,'old-'+i,'old-report-'+i,'SYNTHETIC','unit');
+    }
+    await call(a,'/demo/api/result','POST');await call(a,'/demo/api/result','POST');
+    const done=(await call(a,'/demo/api/state')).body;
+    assert.equal(done.operation.state,'completed');assert.equal(done.results.length,1);
+    assert.equal((await env.LIS_DB.prepare("SELECT count(*) n FROM lis_orders WHERE id NOT LIKE 'old-%'").first()).n,1);
+    env.DEMO_RATE_LIMITER={limit:async()=>({success:false})};
+    assert.equal((await call(a,'/demo/api/state')).status,429);
+  } finally {env.DB.close();env.LIS_DB.close();}
+});
