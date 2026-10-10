@@ -1,0 +1,10 @@
+node_modules/
+apps/worker/dist/
+apps/worker/.celld/
+apps/worker/.wrangler/
+apps/worker/.dev.vars
+apps/worker/.env
+apps/worker/.env.local
+*.db
+*.sqlite
+.DS_Store

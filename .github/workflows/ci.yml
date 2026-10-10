@@ -1,0 +1,22 @@
+name: Scaffold conformance
+on:
+  push:
+  pull_request:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.16.0'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate SQLite migrations
+        run: python scripts/check-sql.py
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Typecheck, bundle and synthetic fault tests
+        run: npm run check
+      # Follow-up: install pinned forgec, run forgec check forge, and add an actual celld smoke test.

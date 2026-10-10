@@ -1,0 +1,11 @@
+[package]
+name = "@hospital-fabric/operations"
+version = "0.1.0"
+edition = "2027"
+
+[source]
+root = "src"
+entry = "src/operations.forge"
+
+# Intentionally no compatibility certification claim. Build/check this model
+# against a pinned forgec revision before using generated migrations.

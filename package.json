@@ -1,0 +1,23 @@
+{
+  "name": "hospital-fabric",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=22.16.0" },
+  "scripts": {
+    "build": "node scripts/embed-migrations.mjs && esbuild apps/worker/src/index.ts --bundle --format=esm --platform=browser --target=es2022 --outfile=apps/worker/dist/index.mjs",
+    "dev:secrets": "node scripts/create-dev-vars.mjs",
+    "dev:celld": "npm run build && celld dev apps/worker",
+    "dev:workerd": "npm run build && wrangler dev --config apps/worker/wrangler.jsonc --local",
+    "typecheck": "tsc --noEmit",
+    "test": "npm run build && node --experimental-sqlite --test tests/*.test.mjs",
+    "check:sql": "python3 scripts/check-sql.py",
+    "check": "npm run check:sql && npm run typecheck && npm test"
+  },
+  "dependencies": { "effect": "4.0.2" },
+  "devDependencies": {
+    "@types/node": "^22.15.0",
+    "esbuild": "^0.25.0",
+    "typescript": "^5.9.3",
+    "wrangler": "^4.0.0"
+  }
+}

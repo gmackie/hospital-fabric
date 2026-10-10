@@ -1,0 +1,150 @@
+-- Prototype integration control plane. No real-patient clinical data is stored here.
+PRAGMA foreign_keys = ON;
+CREATE TABLE IF NOT EXISTS facilities (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  profile TEXT NOT NULL CHECK(profile IN ('clinic','hospital','field-hospital')),
+  demo_only INTEGER NOT NULL DEFAULT 1 CHECK(demo_only = 1),
+  created_at INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS component_instances (
+  id TEXT PRIMARY KEY,
+  facility_id TEXT NOT NULL REFERENCES facilities(id),
+  kind TEXT NOT NULL CHECK(kind IN ('emr','lis','pacs','pharmacy','inventory','gateway','other')),
+  product TEXT NOT NULL,
+  version TEXT,
+  endpoint_url TEXT,
+  enabled INTEGER NOT NULL DEFAULT 0 CHECK(enabled IN (0,1)),
+  capabilities_json TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(capabilities_json)),
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS component_instances_facility ON component_instances(facility_id,kind);
+CREATE TABLE IF NOT EXISTS patient_links (
+  id TEXT PRIMARY KEY,
+  facility_id TEXT NOT NULL REFERENCES facilities(id),
+  source_component_id TEXT NOT NULL,
+  source_patient_ref TEXT NOT NULL,
+  target_component_id TEXT NOT NULL,
+  target_patient_ref TEXT NOT NULL,
+  linkage_method TEXT NOT NULL CHECK(linkage_method IN ('explicit','verified','demo')),
+  approved_by TEXT,
+  created_at INTEGER NOT NULL,
+  UNIQUE (facility_id, source_component_id, source_patient_ref, target_component_id)
+);
+CREATE TABLE IF NOT EXISTS terminology_mappings (
+  id TEXT PRIMARY KEY,
+  facility_id TEXT NOT NULL REFERENCES facilities(id),
+  source_system TEXT NOT NULL,
+  source_code TEXT NOT NULL,
+  target_system TEXT NOT NULL,
+  target_code TEXT NOT NULL,
+  units_code TEXT,
+  mapping_status TEXT NOT NULL CHECK(mapping_status IN ('draft','approved','retired')),
+  approved_by TEXT,
+  created_at INTEGER NOT NULL,
+  UNIQUE(facility_id,source_system,source_code,target_system)
+);
+CREATE TABLE IF NOT EXISTS integration_operations (
+  id TEXT PRIMARY KEY,
+  facility_id TEXT NOT NULL REFERENCES facilities(id),
+  kind TEXT NOT NULL,
+  source_system TEXT NOT NULL,
+  source_resource TEXT NOT NULL,
+  target_system TEXT NOT NULL,
+  target_resource TEXT,
+  idempotency_key TEXT NOT NULL UNIQUE,
+  payload_hash TEXT NOT NULL,
+  state TEXT NOT NULL CHECK(state IN ('queued','dispatching','outcome_unknown','retry','accepted','completed','needs_review')),
+  attempt_count INTEGER NOT NULL DEFAULT 0,
+  last_error TEXT,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS integration_operations_state ON integration_operations(state,updated_at);
+CREATE TABLE IF NOT EXISTS operation_events (
+  id TEXT PRIMARY KEY,
+  operation_id TEXT NOT NULL REFERENCES integration_operations(id),
+  event_type TEXT NOT NULL,
+  details_json TEXT NOT NULL DEFAULT '{}' CHECK(json_valid(details_json)),
+  occurred_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS operation_events_operation ON operation_events(operation_id,occurred_at);
+CREATE TABLE IF NOT EXISTS outbox (
+  id TEXT PRIMARY KEY,
+  operation_id TEXT NOT NULL UNIQUE REFERENCES integration_operations(id),
+  destination TEXT NOT NULL,
+  payload_json TEXT NOT NULL CHECK(json_valid(payload_json)),
+  state TEXT NOT NULL CHECK(state IN ('pending','processing','uncertain','retry','delivered','blocked')),
+  attempts INTEGER NOT NULL DEFAULT 0,
+  available_at INTEGER NOT NULL,
+  lease_token TEXT,
+  lease_until INTEGER,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS outbox_due ON outbox(state,available_at,lease_until);
+CREATE TABLE IF NOT EXISTS inbox (
+  id TEXT PRIMARY KEY,
+  source_system TEXT NOT NULL,
+  dedupe_key TEXT NOT NULL,
+  payload_hash TEXT NOT NULL,
+  state TEXT NOT NULL CHECK(state IN ('received','processed','quarantined')),
+  received_at INTEGER NOT NULL,
+  processed_at INTEGER,
+  UNIQUE(source_system,dedupe_key)
+);
+CREATE TABLE IF NOT EXISTS reconciliation_cases (
+  id TEXT PRIMARY KEY,
+  operation_id TEXT NOT NULL UNIQUE REFERENCES integration_operations(id),
+  reason TEXT NOT NULL,
+  state TEXT NOT NULL CHECK(state IN ('open','resolved','manual_review')),
+  resolution TEXT,
+  opened_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS audit_events (
+  id TEXT PRIMARY KEY,
+  facility_id TEXT,
+  actor TEXT NOT NULL,
+  action TEXT NOT NULL,
+  entity_type TEXT NOT NULL,
+  entity_id TEXT NOT NULL,
+  context_json TEXT NOT NULL DEFAULT '{}' CHECK(json_valid(context_json)),
+  occurred_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS audit_events_lookup ON audit_events(entity_type,entity_id,occurred_at);
+CREATE TABLE IF NOT EXISTS demo_patients (
+  id TEXT PRIMARY KEY,
+  facility_id TEXT NOT NULL REFERENCES facilities(id),
+  label TEXT NOT NULL,
+  synthetic INTEGER NOT NULL DEFAULT 1 CHECK(synthetic = 1),
+  created_at INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS demo_lab_orders (
+  id TEXT PRIMARY KEY,
+  patient_id TEXT NOT NULL REFERENCES demo_patients(id),
+  operation_id TEXT NOT NULL UNIQUE REFERENCES integration_operations(id),
+  test_code TEXT NOT NULL,
+  state TEXT NOT NULL CHECK(state IN ('requested','accepted','completed','needs_review')),
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS demo_chart_results (
+  id TEXT PRIMARY KEY,
+  patient_id TEXT NOT NULL REFERENCES demo_patients(id),
+  operation_id TEXT NOT NULL REFERENCES integration_operations(id),
+  source_report_id TEXT NOT NULL UNIQUE,
+  test_code TEXT NOT NULL,
+  result_text TEXT NOT NULL,
+  unit_code TEXT NOT NULL,
+  simulated INTEGER NOT NULL DEFAULT 1 CHECK(simulated=1),
+  created_at INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS demo_faults (
+  name TEXT PRIMARY KEY,
+  remaining INTEGER NOT NULL CHECK(remaining >= 0)
+);
+INSERT OR IGNORE INTO facilities(id,name,profile,demo_only,created_at) VALUES ('demo-facility','Synthetic Type 2 Hospital','field-hospital',1,0);
+INSERT OR IGNORE INTO component_instances(id,facility_id,kind,product,version,endpoint_url,enabled,capabilities_json,created_at) VALUES
+('demo-openmrs','demo-facility','emr','OpenMRS-compatible simulator',NULL,NULL,1,'["patients","lab-orders"]',0),
+('demo-openelis','demo-facility','lis','OpenELIS-compatible simulator',NULL,NULL,1,'["lab-orders","results","idempotency-query"]',0);
