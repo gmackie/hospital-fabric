@@ -40,7 +40,8 @@ export async function publicDemo(request: Request, env: Env): Promise<Response> 
         await runDispatchBatch(env,1,op.id);
       }
     } else if (url.pathname === '/demo/api/reconcile') {
-      if (op.state==='outcome_unknown' || op.state==='retry') {
+      // A crashed claim can remain dispatching; the dispatcher only reclaims an expired lease.
+      if (op.state==='outcome_unknown' || op.state==='retry' || op.state==='dispatching') {
         await env.DB.prepare("UPDATE outbox SET available_at=0 WHERE operation_id=? AND state='uncertain'").bind(op.id).run();
         await runDispatchBatch(env,1,op.id);
       }

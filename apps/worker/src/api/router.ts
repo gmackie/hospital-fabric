@@ -6,8 +6,9 @@ import { ApiError } from '../domain/errors';
 import { decodeOrder, decodePatient, decodeRelease } from '../domain/contracts';
 import { createLabOrder,createPatient,getOperation,getOperationEvents,getOrders } from '../db/operations';
 import { releaseSimulatedResult } from '../adapters/lis-simulator';
-import { runDispatchBatch } from '../jobs/dispatch';
+import { runDispatchBatch, reconcileOperation } from '../jobs/dispatch';
 import { pollResults } from '../jobs/results';
+import { CONSOLE_HTML, CONSOLE_JS, CONSOLE_CSS } from '../generated/console';
 import { CORE_MIGRATION, OPERATIONS_MIGRATION, PUBLIC_DEMO_MIGRATION, LIS_MIGRATION } from '../generated/migrations';
 
 const json = (body: unknown,status=200) => Response.json(body,{status,headers:{'cache-control':'no-store'}});
@@ -39,6 +40,15 @@ export async function serve(request:Request,env:Env):Promise<Response> {
   const url = new URL(request.url);
   const path = url.pathname;
   const method = request.method;
+  const asset = path==='/' ? [CONSOLE_HTML,'text/html; charset=utf-8'] :
+    path==='/console.js' ? [CONSOLE_JS,'text/javascript; charset=utf-8'] :
+    path==='/console.css' ? [CONSOLE_CSS,'text/css; charset=utf-8'] : null;
+  if (env.PUBLIC_DEMO==='1' && (path==='/console.js' || path==='/console.css')) return json({code:'not_found'},404);
+  if (env.PUBLIC_DEMO!=='1' && method==='GET' && asset) return new Response(asset[0], {headers:{
+    'content-type':asset[1]!, 'cache-control':'no-store', 'x-content-type-options':'nosniff',
+    'referrer-policy':'no-referrer',
+    'content-security-policy':"default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'",
+  }});
   if (method==='GET' && path==='/healthz') return json({ok:true,service:'hospital-fabric',mode:'synthetic-only'});
   if (method==='OPTIONS') return new Response(null,{status:204,headers:noStore});
   try {
@@ -110,10 +120,10 @@ export async function serve(request:Request,env:Env):Promise<Response> {
       if (!op) throw new ApiError(404,'not_found','Operation not found');
       if (op.state!=='outcome_unknown' && op.state!=='retry')
         throw new ApiError(409,'not_reconcilable','Operation does not require delivery reconciliation');
-      await env.DB.prepare("UPDATE outbox SET available_at=0 WHERE operation_id=? AND state='uncertain'")
+      await env.DB.prepare("UPDATE outbox SET available_at=0 WHERE operation_id=? AND state IN ('uncertain','retry')")
         .bind(manualReconcileId).run();
       // Always reads remote state BEFORE resending; cannot blindly duplicate clinical requests.
-      return json({attempts:await runDispatchBatch(env,1), operationId:manualReconcileId});
+      return json({attempts:await reconcileOperation(env,manualReconcileId), operationId:manualReconcileId});
     }
     const eventId=routeId(path,'/v1/operations/','/events');
     if (method==='GET' && eventId) {

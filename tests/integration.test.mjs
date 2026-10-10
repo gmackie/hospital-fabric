@@ -195,6 +195,64 @@ test('lost ACK + simulated Worker restart -> remote lookup, no duplicate',async(
   } finally {env.DB.close();env.LIS_DB.close();}
 });
 
+test('selected reconciliation never dispatches unrelated pending work and records recovery history',async()=>{
+  const {env,call}=await initialize();
+  try {
+    const p=await call('POST','/v1/demo/patients',{label:'SYNTHETIC-TARGETED'});
+    const order=await call('POST','/v1/demo/lab-orders',{
+      patientId:p.body.id,testCode:'CBC',requestId:'targeted-request-001',
+    });
+    const id=order.body.operationId;
+    await call('POST','/v1/demo/faults/drop-next-ack');
+    await call('POST','/v1/admin/tick');
+    const other=await call('POST','/v1/demo/lab-orders',{
+      patientId:p.body.id,testCode:'BMP',requestId:'unrelated-request-001',
+    });
+    // Make the unrelated order older so a generic sweep would choose it first.
+    await env.DB.prepare('UPDATE outbox SET created_at=0 WHERE operation_id=?').bind(other.body.operationId).run();
+    const response=await call('POST',`/v1/operations/${id}/reconcile`);
+    assert.equal(response.status,200);
+    assert.equal(response.body.attempts.length,1);
+    assert.equal(response.body.attempts[0].operationId,id);
+    assert.equal((await call('GET',`/v1/operations/${other.body.operationId}`)).body.operation.state,'queued');
+    assert.equal((await env.LIS_DB.prepare('SELECT count(*) AS n FROM lis_orders').first()).n,1);
+    const timeline=(await call('GET',`/v1/operations/${id}/events`)).body.events;
+    assert.deepEqual(timeline.map(e=>e.event_type),[
+      'order.queued','delivery.attempt_started','delivery.lookup_started','delivery.lookup_completed',
+      'delivery.submit_started','order.outcome_unknown','delivery.attempt_started','delivery.lookup_started',
+      'delivery.lookup_completed','delivery.reconciled','order.accepted',
+    ]);
+    assert.deepEqual(timeline.filter(e=>e.event_type==='delivery.lookup_completed').map(e=>JSON.parse(e.details_json).found),[false,true]);
+    assert.equal((await call('POST',`/v1/operations/${id}/reconcile`)).status,409);
+    assert.equal((await call('POST','/v1/operations/missing/reconcile')).status,404);
+  } finally {env.DB.close();env.LIS_DB.close();}
+});
+
+test('static console has no secrets, stays local and does not bypass API authentication',async()=>{
+  const {env,call}=await initialize();
+  const worker=(await import('../apps/worker/dist/index.mjs')).default;
+  try {
+    for (const path of ['/','/console.js','/console.css']) {
+      const response=await worker.fetch(new Request('http://127.0.0.1:9876'+path),env);
+      assert.equal(response.status,200);
+      assert.equal(response.headers.get('cache-control'),'no-store');
+      assert.equal(response.headers.get('x-content-type-options'),'nosniff');
+      assert.match(response.headers.get('content-security-policy'),/connect-src 'self'/);
+      const text=await response.text();
+      assert.ok(text.length>0);
+      assert.ok(!text.includes(env.DEMO_API_KEY));
+      if(path==='/') {
+        assert.match(text,/\/console.js/);
+        assert.doesNotMatch(text,/<script[^>]+src=["']https?:/);
+      }
+    }
+    assert.equal((await call('GET','/v1/operations',undefined,false)).status,401);
+    env.ALLOW_DEV_BOOTSTRAP='0';
+    assert.equal((await call('POST','/v1/admin/tick')).status,403);
+    assert.equal((await call('POST','/v1/demo/patients',{label:'SYNTHETIC-DISABLED'})).status,403);
+  } finally {env.DB.close();env.LIS_DB.close();}
+});
+
 test('public walkthrough isolates visitors, rejects cross-origin writes and delivers exactly once',async()=>{
   const {env}=await initialize();
   env.PUBLIC_DEMO='1';env.ALLOW_DEV_BOOTSTRAP='0';
@@ -232,5 +290,64 @@ test('public walkthrough isolates visitors, rejects cross-origin writes and deli
     assert.equal((await env.LIS_DB.prepare("SELECT count(*) n FROM lis_orders WHERE id NOT LIKE 'old-%'").first()).n,1);
     env.DEMO_RATE_LIMITER={limit:async()=>({success:false})};
     assert.equal((await call(a,'/demo/api/state')).status,429);
+  } finally {env.DB.close();env.LIS_DB.close();}
+});
+
+test('public demo mode preserves its walkthrough and denies local-console assets',async()=>{
+  const {env,call}=await initialize();
+  const worker=(await import('../apps/worker/dist/index.mjs')).default;
+  try {
+    env.PUBLIC_DEMO='1';
+    env.ALLOW_DEV_BOOTSTRAP='0';
+    const root=await worker.fetch(new Request('https://med.gmac.io/'),env);
+    assert.equal(root.status,200);
+    const html=await root.text();
+    assert.match(html,/Your integration walkthrough/);
+    assert.doesNotMatch(html,/\/console\.js|Local demo token/);
+    for (const path of ['/console.js','/console.css']) {
+      for (const headers of [{},{'x-demo-token':env.DEMO_API_KEY}]) {
+        const response=await worker.fetch(new Request('https://med.gmac.io'+path,{headers}),env);
+        assert.equal(response.status,404);
+        assert.doesNotMatch(await response.text(),/Local demo token|Register synthetic patient/);
+      }
+    }
+    assert.equal((await call('GET','/v1/operations',undefined,false)).status,401);
+    assert.equal((await call('POST','/v1/admin/bootstrap')).status,403);
+  } finally {env.DB.close();env.LIS_DB.close();}
+});
+
+test('public walkthrough recovers crashed dispatching leases without stealing active claims',async()=>{
+  const {env}=await initialize();
+  const worker=(await import('../apps/worker/dist/index.mjs')).default;
+  env.PUBLIC_DEMO='1';env.ALLOW_DEV_BOOTSTRAP='0';
+  let cookie='';
+  const call=async(path,method='POST')=>{
+    const response=await worker.fetch(new Request('https://med.gmac.io/demo/api/'+path,{
+      method,headers:{cookie,origin:'https://med.gmac.io'},
+    }),env);
+    if(response.headers.has('set-cookie'))cookie=response.headers.get('set-cookie').split(';')[0];
+    assert.equal(response.status,200);
+    return response.json();
+  };
+  try {
+    await call('start');
+    const lost=await call('deliver');
+    const id=lost.operation.id;
+    assert.equal(lost.operation.state,'outcome_unknown');
+    // Model a crash during a later reconciliation claim, preserving the committed LIS order.
+    await env.DB.prepare("UPDATE integration_operations SET state='dispatching' WHERE id=?").bind(id).run();
+    await env.DB.prepare("UPDATE outbox SET state='processing',lease_token='crashed-claim',lease_until=? WHERE operation_id=?")
+      .bind(Date.now()+60000,id).run();
+    const active=await call('reconcile');
+    assert.equal(active.operation.state,'dispatching','An active lease must not be stolen');
+    assert.equal(active.operation.attempts,lost.operation.attempts);
+    await env.DB.prepare('UPDATE outbox SET lease_until=0 WHERE operation_id=?').bind(id).run();
+    const recovered=await call('reconcile');
+    assert.equal(recovered.operation.state,'accepted');
+    assert.equal(recovered.operation.attempts,lost.operation.attempts+1);
+    assert.equal((await env.LIS_DB.prepare('SELECT count(*) n FROM lis_orders').first()).n,1);
+    assert.equal(recovered.events.filter(e=>e.event_type==='delivery.reconciled').length,1);
+    const page=await worker.fetch(new Request('https://med.gmac.io/'),env);
+    assert.match(await page.text(),/Check delivery recovery/);
   } finally {env.DB.close();env.LIS_DB.close();}
 });

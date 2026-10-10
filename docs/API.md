@@ -6,6 +6,7 @@ All `v1` endpoints in this repository are **synthetic/demo-only**, require `x-de
 
 | Method | Path | Description |
 |---|---|---|
+| GET | `/`, `/console.js`, `/console.css` | Local-mode static demo console; no embedded token or data; all data/actions still require API authentication. Assets disabled with PUBLIC_DEMO=1 |
 | GET | `/healthz` | No DB check; public liveness |
 | GET | `/readyz` | Both D1 databases reachable; authenticated |
 | POST | `/v1/admin/bootstrap` | Apply embedded migrations; local-dev gated |
@@ -14,8 +15,8 @@ All `v1` endpoints in this repository are **synthetic/demo-only**, require `x-de
 | GET | `/v1/devices` | Medical device readiness projection (initially empty) |
 | GET | `/v1/operations` | Latest synthetic orders and integration state |
 | GET | `/v1/operations/{id}` | Authoritative integration operation |
-| GET | `/v1/operations/{id}/events` | Transaction timeline |
-| POST | `/v1/operations/{id}/reconcile` | Manual recheck of unknown outcome (simulator only) |
+| GET | `/v1/operations/{id}/events` | Integration timeline, including per-attempt lookup/submission/recovery metadata |
+| POST | `/v1/operations/{id}/reconcile` | Selected-operation-only recheck of unknown outcome (simulator only; unrelated due orders are not dispatched) |
 | GET | `/v1/status` | Aggregate operations metrics |
 | POST | `/v1/demo/patients` | Create a synthetic patient |
 | POST | `/v1/demo/lab-orders` | Create synthetic request, persist outbox atomically |

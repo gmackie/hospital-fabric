@@ -33,7 +33,16 @@ async function claim(env: Env, operationId?: string): Promise<Pending | null> {
   if (!claimed) return null;
   await env.DB.prepare("UPDATE integration_operations SET state='dispatching', attempt_count=attempt_count+1,updated_at=? WHERE id=? AND state NOT IN ('accepted','completed')")
     .bind(at,due.operation_id).run();
-  return { ...due, lease_token: token };
+  const item = { ...due, lease_token: token };
+  await recordEvent(env, item, 'delivery.attempt_started', {attempt: due.attempts + 1});
+  return item;
+}
+
+/** Persist integration metadata only, fenced to the active delivery attempt. */
+async function recordEvent(env: Env, item: Pending, type: string, details: Record<string, unknown>) {
+  await env.DB.prepare(`INSERT INTO operation_events(id,operation_id,event_type,details_json,occurred_at)
+    SELECT ?,?,?,?,? WHERE EXISTS(SELECT 1 FROM outbox WHERE id=? AND lease_token=? AND state='processing')`)
+    .bind(crypto.randomUUID(),item.operation_id,type,JSON.stringify(details),Date.now(),item.id,item.lease_token).run();
 }
 
 /** Every related write is conditional on the lease. A stale worker must not finalize the order. */
@@ -73,13 +82,14 @@ async function uncertain(env: Env,item: Pending,error: unknown) {
       .bind(`case:${item.operation_id}`,item.operation_id,at,at,item.id,item.lease_token),
     env.DB.prepare(`INSERT OR IGNORE INTO operation_events(id,operation_id,event_type,details_json,occurred_at)
       SELECT ?,?,'order.outcome_unknown',?,? WHERE ${gate}`)
-      .bind(`event:unknown:${item.operation_id}`,item.operation_id,JSON.stringify({reason:'destination acknowledgment unavailable'}),at,item.id,item.lease_token),
+      .bind(`event:unknown:${item.lease_token}`,item.operation_id,JSON.stringify({reason:'destination acknowledgment unavailable'}),at,item.id,item.lease_token),
     env.DB.prepare(`UPDATE outbox SET state='uncertain',available_at=?,lease_token=NULL,lease_until=NULL,updated_at=?
       WHERE id=? AND lease_token=? AND state='processing'`).bind(retryAt,at,item.id,item.lease_token),
   ]);
 }
 
 async function blocked(env: Env,item: Pending,error: unknown) {
+  await recordEvent(env, item, 'order.needs_review', {reason: 'conflict_or_repeated_ambiguity'});
   const at=Date.now();
   const gate = `EXISTS(SELECT 1 FROM outbox WHERE id=? AND lease_token=? AND state='processing')`;
   await env.DB.batch([
@@ -103,7 +113,10 @@ export const dispatchOnce = (env: Env, operationId?: string) => Effect.gen(funct
     try: async () => {
       // Reconcile before sending: prior attempts may have committed remotely.
       const adapter = simulatedLisAdapter(env);
+      await recordEvent(env, item, 'delivery.lookup_started', {attempt: item.attempts + 1});
       const existing = await adapter.lookupByKey(item.idempotency_key);
+      await recordEvent(env, item, 'delivery.lookup_completed', {found: !!existing});
+      if (!existing) await recordEvent(env, item, 'delivery.submit_started', {attempt: item.attempts + 1});
       const remote = existing ?? await adapter.submit({
         key: item.idempotency_key, hash: item.payload_hash,
         patientId: item.patient_id, testCode: item.test_code,
@@ -111,6 +124,7 @@ export const dispatchOnce = (env: Env, operationId?: string) => Effect.gen(funct
       if (remote.payload_hash !== item.payload_hash) {
         throw new ReconciliationRequired('Destination order conflicts with source');
       }
+      await recordEvent(env, item, existing ? 'delivery.reconciled' : 'delivery.acknowledged', {externalRef: `LisOrder/${remote.id}`});
       await accepted(env, item, remote.id);
       return remote.id;
     },
@@ -137,4 +151,10 @@ export async function runDispatchBatch(env: Env, limit=10, operationId?: string)
     if (result.state === 'outcome_unknown' || result.state === 'needs_review') break;
   }
   return outcomes;
+}
+
+/** A selected-operation action must never dispatch an unrelated due order. */
+export async function reconcileOperation(env: Env, operationId: string) {
+  const result = await Effect.runPromise(dispatchOnce(env, operationId));
+  return result.ran ? [result] : [];
 }

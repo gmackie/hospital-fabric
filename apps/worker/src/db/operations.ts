@@ -94,7 +94,7 @@ export async function getOperation(env: Env, operationId: string) {
 }
 
 export async function getOperationEvents(env: Env, operationId: string) {
-  const { results } = await env.DB.prepare('SELECT id,event_type,details_json,occurred_at FROM operation_events WHERE operation_id=? ORDER BY occurred_at,id LIMIT 250')
+  const { results } = await env.DB.prepare('SELECT id,event_type,details_json,occurred_at FROM operation_events WHERE operation_id=? ORDER BY occurred_at,rowid LIMIT 250')
     .bind(operationId).all();
   return results;
 }
