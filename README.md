@@ -86,4 +86,6 @@ This is intended to live at `gmackie/hospital-fabric` (GitHub repository must be
 
 ## Verification status
 
-`npm run check` passes SQLite integrity checks, the Effect 4.0.2 typecheck, bundling, and five synthetic integration tests. GitHub Actions also runs `npm run smoke:workerd`: it starts Wrangler locally with two D1 bindings and verifies bootstrap, lost-acknowledgment reconciliation, result import, and the final completed operation state. The D1 mock follows workerd's line-oriented `exec` behavior so malformed bootstrap SQL is caught in the integration tests.\n\nThe `celld` runtime smoke test and `forgec check forge` remain outstanding. Workerd validation does not establish celld compatibility or clinical suitability. Nothing has been deployed; do not use real patient data.
+`npm run check` passes SQLite integrity checks, the Effect 4.0.2 typecheck, bundling, and five synthetic integration tests. GitHub Actions also runs `npm run smoke:workerd`: it starts Wrangler locally with two D1 bindings and verifies bootstrap, lost-acknowledgment reconciliation, result import, and the final completed operation state. The D1 mock follows workerd's line-oriented `exec` behavior so malformed bootstrap SQL is caught in the integration tests.
+
+The `celld` runtime smoke test and `forgec check forge` remain outstanding. Workerd validation does not establish celld compatibility or clinical suitability. Nothing has been deployed; do not use real patient data.
