@@ -9,7 +9,11 @@ class D1SqliteMock {
     this.sqlite.exec('PRAGMA foreign_keys=ON;');
   }
   prepare(sql) { return new D1Stmt(this, sql, []); }
-  async exec(sql) { this.sqlite.exec(sql); return {success:true}; }
+  async exec(sql) {
+    // Match workerd's D1 exec contract: each line is a separate statement.
+    for (const statement of sql.trim().split('\n')) this.sqlite.prepare(statement).run();
+    return {success:true};
+  }
   async batch(statements) {
     this.sqlite.exec('BEGIN IMMEDIATE;');
     try {
