@@ -1,0 +1,15 @@
+[Unit]
+Description=Verify and publish Hospital Fabric fixed synthetic workflow
+After=hospital-fabric-stack.service network-online.target
+[Service]
+Type=oneshot
+User=root
+UMask=0077
+ExecStart=/root/.nix-profile/bin/node /mnt/master-apps/hospital-fabric/release/deploy/real/hetzner-master/publish-real-demo.mjs
+TimeoutStartSec=90
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/mnt/master-apps/hospital-fabric/private
+[Install]
+WantedBy=multi-user.target

@@ -83,3 +83,9 @@ Provide existing authorization headers through the host secret environment using
 - Only after all of the above may the demo label this path connected to real OpenMRS/OpenELIS.
 
 Official source details: [OpenMRS FHIR guide](https://fhir.openmrs.org/), [OpenELIS workflow](https://github.com/DIGI-UW/openelis-global2-fhir-ig/blob/main/input/pagecontent/workflows.md), [API distinctions](https://github.com/DIGI-UW/openelis-global2-fhir-ig/blob/main/input/pagecontent/api.md), [known correlation issues](https://github.com/DIGI-UW/openelis-global2-fhir-ig/blob/main/input/pagecontent/known-issues.md), [upstream co-resident source example](https://github.com/ozone-his/eip-openelis-openmrs#steps-to-run) (its bridge is marked incomplete, so use this as topology evidence, not current E2E certification).
+
+## Verified fixed synthetic round-trip
+
+The `hetzner-master` fixture now completes real registration, laboratory import, whole-blood accession, result entry, validation and chart return. The product emits a final hemoglobin report/observation at 13.2 g/dL. The chart importer checks the completed local Task, original order, accession, patient, specimen, report, LOINC and unit correlation; it resolves the installed OpenMRS numeric concept and uses supported observation REST writes. The persisted chart value is read back through REST and FHIR. Replay reconciles the existing observation, and source amendments stop for review.
+
+The public Cloudflare Worker receives a fixed proof projection pushed by a host verifier every minute. It exposes no clinical proxy or product commands. The interactive simulator remains available alongside a refreshable real-system verification card. `/internal/demo/real-evidence` requires its separate Worker secret, rejects extra fields and accepts only a recent timestamp plus the fixed synthetic value; `/demo/api/real` marks proof stale after five minutes. This is a verified fixed scenario, not a multi-patient clinical connector.

@@ -15,7 +15,7 @@ for db_name, path in [('fabric', root/'core'), ('synthetic LIS', root/'sim_lis')
     if db_name == 'fabric':
         assert db.execute('SELECT count(*) FROM facilities').fetchone()[0] == 1
         assert db.execute('SELECT count(*) FROM component_instances').fetchone()[0] == 2
-        assert db.execute("SELECT count(*) FROM sqlite_master WHERE type='table'").fetchone()[0] == 21
+        assert db.execute("SELECT count(*) FROM sqlite_master WHERE type='table'").fetchone()[0] == 22
         try:
             db.execute("INSERT INTO facilities(id,name,profile,demo_only,created_at) VALUES ('bad','Bad','hospital',0,0)")
         except sqlite3.IntegrityError:

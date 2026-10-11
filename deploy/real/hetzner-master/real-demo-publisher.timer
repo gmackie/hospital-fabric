@@ -1,0 +1,8 @@
+[Unit]
+Description=Refresh Hospital Fabric synthetic workflow verification
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=1min
+Unit=hospital-fabric-real-demo-publisher.service
+[Install]
+WantedBy=timers.target

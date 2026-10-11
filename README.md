@@ -4,7 +4,7 @@
 
 The prototype includes a bundled React operator console and a real workerd restart/recovery acceptance harness. See [the blackout demo guide](docs/BLACKOUT-DEMO.md) for the interactive workflow and boundaries.
 
-The first slice demonstrates durable order delivery between a synthetic OpenMRS-like order source and an independently persisted simulated LIS. Both data stores are SQLite-backed D1 bindings. This code doesn't run real OpenMRS or OpenELIS; those remain future adapters and separate clinical applications.
+The first slice demonstrates durable order delivery between a synthetic OpenMRS-like order source and an independently persisted simulated LIS. Both data stores are SQLite-backed D1 bindings. The public walkthrough uses those simulators. A separate fixed synthetic hemoglobin workflow now runs through private OpenMRS/OpenELIS services on hetzner-master, with verified result return and a refreshable proof card at med.gmac.io. See [the host runbook](docs/HETZNER-MASTER.md).
 
 ## Public cloud demo
 

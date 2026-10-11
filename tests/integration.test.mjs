@@ -351,3 +351,19 @@ test('public walkthrough recovers crashed dispatching leases without stealing ac
     assert.match(await page.text(),/Check delivery recovery/);
   } finally {env.DB.close();env.LIS_DB.close();}
 });
+
+test('real demo bridge accepts only authenticated fixed synthetic projections',async()=>{
+ const {env}=await initialize();env.PUBLIC_DEMO='1';env.REAL_DEMO_BRIDGE_TOKEN='test-bridge-token-with-at-least-32-characters';
+ const worker=(await import('../apps/worker/dist/index.mjs')).default;
+ const publish=body=>worker.fetch(new Request('https://med.gmac.io/internal/demo/real-evidence',{method:'POST',headers:{authorization:'Bearer '+env.REAL_DEMO_BRIDGE_TOKEN},body:JSON.stringify(body)}),env);
+ const proof={verifiedAt:new Date().toISOString(),value:13.2};
+ assert.equal((await worker.fetch(new Request('https://med.gmac.io/internal/demo/real-evidence',{method:'POST',body:JSON.stringify(proof)}),env)).status,401);
+ for(const body of [{...proof,patientId:'private'},{...proof,value:14},{...proof,verifiedAt:'2000-01-01'},null])assert.equal((await publish(body)).status,400);
+ assert.equal((await publish(proof)).status,200);
+ assert.equal((await publish(proof)).status,200);
+ const response=await worker.fetch(new Request('https://med.gmac.io/demo/api/real'),env);const publicData=await response.json();
+ assert.equal(publicData.fresh,true);assert.equal(publicData.result.value,13.2);assert.equal(publicData.syntheticOnly,true);
+ assert.equal(JSON.stringify(publicData).includes(env.REAL_DEMO_BRIDGE_TOKEN),false);
+ assert.equal(await env.DB.prepare('SELECT count(*) AS n FROM real_demo_evidence').first().then(x=>x.n),1);
+ env.DB.close();env.LIS_DB.close();
+});
