@@ -1,0 +1,56 @@
+{
+ "schema": "hospital-fabric-canonical-vectors/v1",
+ "algorithm": "sha256-canonical-json/v1",
+ "cases": [
+  {
+   "name": "nested-unicode",
+   "value": {
+    "z": [
+     3,
+     {
+      "b": null,
+      "a": true
+     }
+    ],
+    "a": "Synthetic CBC · 7.5 × 10⁹/L",
+    "m": {
+     "y": -1,
+     "x": "line\nbreak \"quoted\" \\ tab\t\u0001"
+    },
+    "e": [],
+    "o": {}
+   },
+   "canonical": "{\"a\":\"Synthetic CBC · 7.5 × 10⁹/L\",\"e\":[],\"m\":{\"x\":\"line\\nbreak \\\"quoted\\\" \\\\ tab\\t\\u0001\",\"y\":-1},\"o\":{},\"z\":[3,{\"a\":true,\"b\":null}]}",
+   "sha256": "a7c2c9f67c35cf25f8a2150f83047219f70b09ad6bb58fa664e131722f0df958"
+  },
+  {
+   "name": "integers-and-false",
+   "value": {
+    "minute": 480,
+    "wan": false,
+    "stock": 0,
+    "neg": -42,
+    "big": 9007199254740991
+   },
+   "canonical": "{\"big\":9007199254740991,\"minute\":480,\"neg\":-42,\"stock\":0,\"wan\":false}",
+   "sha256": "900a45da6d36081def93a7303f04c9e3560d46d8137e7cca3e012e27d5ceae72"
+  },
+  {
+   "name": "array-order-preserved",
+   "value": [
+    [
+     "W-02",
+     "W-01"
+    ],
+    {
+     "k2": 1,
+     "k10": 2,
+     "K": 3,
+     "_": 4
+    }
+   ],
+   "canonical": "[[\"W-02\",\"W-01\"],{\"K\":3,\"_\":4,\"k10\":2,\"k2\":1}]",
+   "sha256": "0e542af07a63d44c408b2e7c8e3ffbcce939bbbd355d0784943a13eae05a385f"
+  }
+ ]
+}

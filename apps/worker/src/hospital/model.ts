@@ -3,8 +3,25 @@ export type Stage = 'registration'|'assessment'|'lab_queued'|'lab_unknown'|'lab_
 export type Journey = 'outpatient'|'medical'|'surgical';
 export type Patient = { id:string; name:string; journey:Journey; stage:Stage; bed:string|null; labId:string|null; result:string|null; image:string|null; dispensed:boolean; arrived:number };
 export type Command = { requestId:string; version:number; action:'advance'|'arrival'|'wan'|'clock'|'resupply'; patientId?:string };
-export type Hospital = { minute:number; wan:boolean; patients:Patient[]; beds:string[]; stock:number; initialStock:number; warehouse:number; labOrders:{id:string;patientId:string;accepted:boolean}[]; referrals:number; events:{at:number;patientId:string|null;department:string;text:string}[]; receipts:{id:string;fingerprint:string}[] };
+export type Hospital = { minute:number; wan:boolean; patients:Patient[]; beds:string[]; stock:number; initialStock:number; warehouse:number; labOrders:{id:string;patientId:string;accepted:boolean}[]; referrals:number; events:{at:number;patientId:string|null;department:string;text:string}[]; receipts:{id:string;fingerprint:string}[]; profile?:Profile };
+/** Bounded shift sizing. The public demo always uses DEFAULT_PROFILE; research profiles are local-only. */
+export type Profile = { initialPatients:number; maxArrivals:number; beds:number; theatres:number; stock:number; warehouse:number; commandLimit:number };
+export const DEFAULT_PROFILE:Profile = {initialPatients:6,maxArrivals:12,beds:3,theatres:1,stock:4,warehouse:12,commandLimit:240};
+export const PROFILE_CAPS:Record<keyof Profile,[number,number]> = {initialPatients:[1,60],maxArrivals:[1,60],beds:[1,30],theatres:[1,6],stock:[0,200],warehouse:[0,400],commandLimit:[1,2000]};
 export class SimulationError extends Error { constructor(public status:number, public code:string, message:string) { super(message); } }
+export function resolveProfile(input:unknown):Profile {
+  if(input===undefined)return {...DEFAULT_PROFILE};
+  const keys=Object.keys(PROFILE_CAPS) as (keyof Profile)[];
+  const bad=()=>new SimulationError(400,'invalid_profile',`A profile needs integer ${keys.join(', ')} within the research caps.`);
+  if(!input||typeof input!=='object'||Array.isArray(input))throw bad();
+  const o=input as Record<string,unknown>;
+  if(Object.keys(o).length!==keys.length||keys.some(k=>{const v=o[k],[lo,hi]=PROFILE_CAPS[k];return typeof v!=='number'||!Number.isInteger(v)||v<lo||v>hi;}))throw bad();
+  const p=Object.fromEntries(keys.map(k=>[k,o[k]])) as Profile;
+  if(p.initialPatients>p.maxArrivals)throw bad();
+  return p;
+}
+export const profileOf=(s:Hospital):Profile=>s.profile??DEFAULT_PROFILE;
+const isDefault=(p:Profile)=>(Object.keys(DEFAULT_PROFILE) as (keyof Profile)[]).every(k=>p[k]===DEFAULT_PROFILE[k]);
 const names = ['Alex Demo','Robin Demo','Sam Demo','Taylor Demo','Morgan Demo','Jordan Demo','Casey Demo','Jamie Demo','Avery Demo','Riley Demo','Drew Demo','Quinn Demo'];
 export const departments = ['Registration','Emergency & outpatient','Laboratory','Imaging','Ward','Theatre','Pharmacy','Discharge'];
 export function department(p:Patient):string {
@@ -19,15 +36,18 @@ export function department(p:Patient):string {
 }
 function event(s:Hospital,p:Patient|null,d:string,text:string) { s.events.push({at:s.minute,patientId:p?.id??null,department:d,text}); s.events=s.events.slice(-120); }
 function arrival(s:Hospital) {
-  const n=s.patients.length;
-  if(n>=12) throw new SimulationError(409,'arrival_limit','This hospital shift has reached its 12-patient limit.');
+  const n=s.patients.length,limit=profileOf(s).maxArrivals;
+  if(n>=limit) throw new SimulationError(409,'arrival_limit',`This hospital shift has reached its ${limit}-patient limit.`);
   const journey:Journey=(['medical','surgical','outpatient'] as const)[n%3]!;
-  const p:Patient={id:`SIM-${String(n+1).padStart(3,'0')}`,name:names[n]!,journey,stage:'registration',bed:null,labId:null,result:null,image:null,dispensed:false,arrived:s.minute};
+  const p:Patient={id:`SIM-${String(n+1).padStart(3,'0')}`,name:names[n]??`Demo Patient ${n+1}`,journey,stage:'registration',bed:null,labId:null,result:null,image:null,dispensed:false,arrived:s.minute};
   s.patients.push(p); event(s,p,'Registration',`${p.name} arrived for a scripted ${journey} journey.`);
 }
-export function seedHospital():Hospital {
-  const s:Hospital={minute:480,wan:true,patients:[],beds:['W-01','W-02','W-03'],stock:4,initialStock:4,warehouse:12,labOrders:[],referrals:0,events:[],receipts:[]};
-  for(let i=0;i<6;i++) arrival(s);
+export function seedHospital(profile:Profile=DEFAULT_PROFILE):Hospital {
+  const p=resolveProfile(profile);
+  const beds=Array.from({length:p.beds},(_,i)=>`W-${String(i+1).padStart(2,'0')}`);
+  const s:Hospital={minute:480,wan:true,patients:[],beds,stock:p.stock,initialStock:p.stock,warehouse:p.warehouse,labOrders:[],referrals:0,events:[],receipts:[]};
+  if(!isDefault(p))s.profile=p;
+  for(let i=0;i<p.initialPatients;i++) arrival(s);
   return s;
 }
 export function nextAction(p:Patient):string {
@@ -41,7 +61,8 @@ export function applyCommand(original:Hospital,c:Command):Hospital {
     if(receipt.fingerprint!==fingerprint) throw new SimulationError(409,'idempotency_conflict','That command ID was used for a different action.');
     return s;
   }
-  if(s.receipts.length>=240) throw new SimulationError(409,'shift_complete','This simulation has reached its 240-command limit.');
+  const commandLimit=profileOf(s).commandLimit;
+  if(s.receipts.length>=commandLimit) throw new SimulationError(409,'shift_complete',`This simulation has reached its ${commandLimit}-command limit.`);
   if(c.action==='arrival') arrival(s);
   else if(c.action==='wan') {s.wan=!s.wan;event(s,null,'Infrastructure',s.wan?'WAN restored; referral queue synchronized.':'WAN disconnected in the model; local departments remain available.');if(s.wan)s.referrals=0;}
   else if(c.action==='resupply') {if(s.warehouse<4)throw new SimulationError(409,'warehouse_empty','The local warehouse has no remaining resupply packs.');s.warehouse-=4;s.stock+=4;s.initialStock+=4;event(s,null,'Inventory','Four demo medicine packs moved from local warehouse to pharmacy.');}
@@ -73,7 +94,8 @@ export function applyCommand(original:Hospital,c:Command):Hospital {
       }
       case 'ward': {
         if(p.journey==='surgical') {
-          if(s.patients.some(other=>other.stage==='theatre'))throw new SimulationError(409,'theatre_busy','The single theatre is occupied. Complete its current procedure first.');
+          const theatres=profileOf(s).theatres;
+          if(s.patients.filter(other=>other.stage==='theatre').length>=theatres)throw new SimulationError(409,'theatre_busy',theatres===1?'The single theatre is occupied. Complete its current procedure first.':`All ${theatres} theatres are occupied. Complete a current procedure first.`);
           p.stage='theatre';event(s,p,d,'Theatre slot reserved; ward bed retained.');
         } else {p.stage='pharmacy';event(s,p,d,'Scripted ward stay complete; discharge dispensing queued.');}
         break;
@@ -95,8 +117,8 @@ export function applyCommand(original:Hospital,c:Command):Hospital {
   return s;
 }
 export function validateHospital(s:Hospital) {
-  const beds=s.patients.flatMap(p=>p.bed?[p.bed]:[]);
-  if(new Set(beds).size!==beds.length||beds.some(b=>!s.beds.includes(b))||s.stock<0||s.warehouse<0||s.warehouse+s.initialStock!==16||s.stock+s.patients.filter(p=>p.dispensed).length!==s.initialStock||s.patients.filter(p=>p.stage==='theatre').length>1||new Set(s.labOrders.map(o=>o.id)).size!==s.labOrders.length)throw new Error('Hospital simulation invariant failed');
+  const beds=s.patients.flatMap(p=>p.bed?[p.bed]:[]),profile=profileOf(s);
+  if(new Set(beds).size!==beds.length||beds.some(b=>!s.beds.includes(b))||s.stock<0||s.warehouse<0||s.warehouse+s.initialStock!==profile.stock+profile.warehouse||s.stock+s.patients.filter(p=>p.dispensed).length!==s.initialStock||s.patients.filter(p=>p.stage==='theatre').length>profile.theatres||new Set(s.labOrders.map(o=>o.id)).size!==s.labOrders.length)throw new Error('Hospital simulation invariant failed');
 }
 export function viewHospital(s:Hospital,version:number) {
   return {...s,receipts:undefined,version,syntheticOnly:true,patients:s.patients.map(p=>({...p,department:department(p),nextAction:nextAction(p)})),departments:departments.map(name=>({name,queue:s.patients.filter(p=>department(p)===name&&p.stage!=='discharged').map(p=>p.id)}))};

@@ -20,6 +20,20 @@ One `hospital_simulations` D1 row owns each hospital. Version comparison and a c
 
 Actions: `advance` (patient required), `arrival`, `wan`, `clock`, `resupply`. Unknown fields, arbitrary patient data and unsupported commands are rejected. POST requires the same origin; cloud requests share the existing rate limiter. Inputs are capped at 2 KiB. There is no public reset, product proxy or clinical data entry.
 
+## Research profiles, export and protocol (local only)
+
+A local worker (`PUBLIC_DEMO` unset) also serves as a reproducible instrument for external simulators such as kybernos. The public deployment rejects all of this with `403 profile_not_allowed` and keeps the fixed 12/240/3/1/16 shift.
+
+| Method | Endpoint | Behavior |
+| --- | --- | --- |
+| GET | `/hospital/api/protocol` | Model id `hospital-fabric-shift` v1, action semantics `hospital-fabric-commands/v1`, digest algorithm, default profile and caps, and whether research profiles are enabled |
+| POST | `/hospital/api/session` | Optional body `{"profile":{…}}` always allocates a fresh shift with that sizing |
+| GET | `/hospital/api/export` | `hospital-fabric-shift-export/v1`: full state including command receipts, version, resolved profile and `stateDigest` |
+
+A profile must supply every field as an integer within its cap: `initialPatients` 1–60 (≤ `maxArrivals`), `maxArrivals` 1–60, `beds` 1–30, `theatres` 1–6, `stock` 0–200, `warehouse` 0–400, `commandLimit` 1–2000. Stock conservation checks against the profile's own totals. The default profile serialises byte-identically to the original shift, so existing sessions and digests are unchanged.
+
+Every state, session and command response also carries `stateDigest`. This is `sha256-canonical-json/v1` over the stored state: keys sorted, no whitespace, UTF-8, integer numbers only. `tests/fixtures/canonical-vectors.json` pins the algorithm and is shared verbatim with kybernos. Because `seedHospital` and `applyCommand` are pure, an ordered command log plus its profile fully determines every digest. That is what makes an external replay checkable.
+
 ## Verification
 
 After deployment, run `node scripts/smoke-hospital.mjs` to verify three complete journeys, replay safety, isolation and WAN queues against the public target. Override `HOSPITAL_URL` for another same-origin deployment. The smoke creates two bounded synthetic visitor sessions.
