@@ -20,8 +20,8 @@ The reusable compiler/runtime is **gmackie/forgec**, not an existing `gmackie/fo
 ## Current milestone (intentionally limited)
 
 - The executable demo uses hand-maintained D1 SQL migrations. It contains a **draft** Forge resource model in `forge/` for facility, component instance and device passport.
-- The Forge model is **not generated, compiled, or connected to live tables**. The compiler was not available in this execution environment; do not represent this model as a passing forgec build.
-- After `forgec check forge` and an explicit migration comparison, let Forge own facility/component/device data. Do not run two schema writers in the same DB.
+- The Forge model passes pinned forgec 0.5.0 check/build and isolated generated D1 integrity checks. Generated artifacts are **not connected to live tables**; see [the schema ownership comparison](WEEKEND-ACCEPTANCE.md).
+- After an explicit conversion and migration cutover is verified, let Forge own facility/component/device data. Check/build and the initial comparison alone do not perform that cutover. Do not run two schema writers in the same DB.
 - Leave `integration_operations`, `outbox`, `inbox` and `reconciliation_cases` as explicitly managed integration state until Forge's atomic event/recovery semantics are proven with the failure tests.
 - Source EMR/LIS/PACS databases are never modified directly. All real connectors must use supported external APIs.
 

@@ -1,15 +1,7 @@
-# Publish the standalone repo
+# Repository and acceptance checks
 
-The code package is not a remote GitHub repository. Create one with GitHub CLI after authenticating:
+The standalone repository is https://github.com/gmackie/hospital-fabric. Publish reviewed branches/PRs to that existing repository.
 
-```bash
-cd hospital-fabric
-git init -b main
-git add .
-git commit -m 'feat: scaffold offline hospital integration fabric'
-gh repo create gmackie/hospital-fabric --private --source=. --remote=origin --push
-```
+GitHub CI runs SQL integrity, TypeScript/build, synthetic fault tests, workerd crash/restart recovery, Chromium console scenarios, pinned Forge check/build with isolated generated SQL, and pinned celld crash/restart/local-bucket restore acceptance. Run the commands in [the weekend checklist](WEEKEND-ACCEPTANCE.md) to reproduce them locally.
 
-If the remote repository already exists, do not run `gh repo create`; add that remote and push a reviewed branch/PR instead.
-
-CI runs the SQLite schema checks and attempts to install dependencies and run TypeScript/synthetic fault tests. Verify against `celld dev` and local workerd separately. The `forge/` model is a **draft** and is not run by CI yet.
+The ForgeGraph app registry identity is in `.forgegraph.yaml`. GitHub repository/CI and Cloudflare production evidence synchronization remain HF-2 work; this file does not configure deployment or automatic issue closure. Generated Forge schemas remain isolated from authoritative live tables.

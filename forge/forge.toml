@@ -8,4 +8,4 @@ root = "src"
 entry = "src/operations.forge"
 
 # Intentionally no compatibility certification claim. Build/check this model
-# against a pinned forgec revision before using generated migrations.
+# passes forgec 0.5.0 check/build; ownership cutover is still required before use.

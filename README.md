@@ -8,11 +8,11 @@ The first slice demonstrates durable order delivery between a synthetic OpenMRS-
 
 ## Public cloud demo
 
-The public interactive synthetic walkthrough is hosted at [med.gmac.io](https://med.gmac.io) on Cloudflare Workers with two independent D1 databases. It demonstrates order delivery, a lost acknowledgment, reconciliation, and result import. No token is needed for that isolated public walkthrough. The token-based operator console in this PR is served only when `PUBLIC_DEMO` is not enabled and is not deployed by this change. See [cloud deployment and verification](docs/CLOUD-DEMO.md).
+The public interactive synthetic walkthrough is hosted at [med.gmac.io](https://med.gmac.io) on Cloudflare Workers with two independent D1 databases. It demonstrates order delivery, a lost acknowledgment, reconciliation, and result import. No token is needed for that isolated public walkthrough. The token-based local operator console is served only when `PUBLIC_DEMO` is not enabled and is not deployed publicly. See [cloud deployment and verification](docs/CLOUD-DEMO.md).
 
-## Real-service integration preparation
+## Real-service synthetic integration
 
-Private OpenMRS/OpenELIS deployment overlays, read-only probes and guarded FHIR protocol clients are prepared in [the real-services guide](docs/REAL-SERVICES.md). They are not enabled in the public demo and have not been tested against running product instances. That guide records the exact deployment and end-to-end gates before enabling a real synthetic workflow.
+Private OpenMRS/OpenELIS services now complete a fixed synthetic hemoglobin round-trip, including verified result return to OpenMRS. The public proof card reports that saved workflow; interactive public actions use the simulator. See [the host runbook](docs/HETZNER-MASTER.md) and [protocol boundaries](docs/REAL-SERVICES.md).
 
 ## Prerequisites
 
@@ -88,7 +88,7 @@ Read [API plan](docs/API.md), [database model](docs/DB.md), [Forge ownership](do
 
 ## What's *not* implemented
 
-No working OpenMRS, OpenELIS, Orthanc or OpenBoxes adapters; no FHIR/HL7/DICOM gateway; no live authentication/RBAC/ABAC; no clinical operational UI; no encrypted clinical audit storage; no multi-node recovery validation; no medical-device integration; no actual clinical use. See `docs/PRODUCTION.md` before making any production claims.
+No general multi-patient OpenMRS/OpenELIS connector, Orthanc/OpenBoxes adapter, or HL7/DICOM gateway; no live authentication/RBAC/ABAC; no clinical operational UI; no encrypted clinical audit storage; no multi-node recovery validation; no medical-device integration; no actual clinical use. See `docs/PRODUCTION.md` before making any production claims.
 
 ## Repository ownership and Forge
 
@@ -98,4 +98,4 @@ This application lives at `gmackie/hospital-fabric`. Forge's maintained compiler
 
 `npm run check` passes SQLite integrity checks, the Effect 4.0.2 typecheck, bundling, and the synthetic integration tests. GitHub Actions also runs `npm run smoke:workerd`: it starts Wrangler locally with two D1 bindings, loses a committed LIS acknowledgment, kills and restarts the runtime using the same persisted databases, reconciles by stable ID, and verifies exactly one LIS order/result plus the final completed operation state. Console Chromium tests cover the synthetic flow and interrupted/repeated interactions. The D1 mock follows workerd's line-oriented `exec` behavior so malformed bootstrap SQL is caught in the integration tests.
 
-The `celld` runtime smoke test, physical WAN-disconnection exercise and `forgec check forge` remain outstanding. Workerd validation does not establish celld compatibility or clinical suitability. The public synthetic demo is deployed separately on Cloudflare; do not use real patient data.
+The pinned celld 0.6.2 crash/restart smoke and Forge compiler 0.5.0 check/build now pass. Generated SQL is validated in isolation and does not own live tables. See [the weekend acceptance checklist](docs/WEEKEND-ACCEPTANCE.md) for repeatable commands and outstanding physical WAN, backup/restore and ForgeGraph evidence work. Workerd validation does not establish celld compatibility or clinical suitability. The public synthetic demo is deployed separately on Cloudflare; do not use real patient data.

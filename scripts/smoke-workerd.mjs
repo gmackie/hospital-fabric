@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawn, execFileSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, mkdirSync, cpSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { createServer } from 'node:net';
@@ -8,7 +8,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 
 /** Synthetic ACK loss + an actual local runtime stop, not a WAN-disconnection test. */
-export async function runBlackoutScenario({ request, restart, inspect, stop }) {
+export async function runBlackoutScenario({ request, restart, inspect, stop, runtime = 'real local workerd' }) {
   await request('POST', '/v1/admin/bootstrap');
   const patient = await request('POST', '/v1/demo/patients', {
     label: `SYNTHETIC-RESTART-${Date.now()}`,
@@ -28,8 +28,8 @@ export async function runBlackoutScenario({ request, restart, inspect, stop }) {
   // restart() kills the runtime, verifies HTTP is unavailable, and inspects durable
   // D1 state before creating a new process using the very same persistence path.
   let committed;
-  await restart(() => {
-    committed = inspect(before.idempotency_key);
+  await restart(async () => {
+    committed = await inspect(before.idempotency_key);
     assert.equal(committed.orders.length, 1, 'LIS must have committed exactly one order before restart');
     assert.equal(committed.operations.length, 1);
     assert.equal(committed.operations[0].state, 'outcome_unknown');
@@ -70,7 +70,7 @@ export async function runBlackoutScenario({ request, restart, inspect, stop }) {
     assert.equal(events.filter(event => event.event_type === type).length, 1, `Exactly one ${type} event`);
   }
   await stop();
-  const persisted = inspect(before.idempotency_key);
+  const persisted = await inspect(before.idempotency_key, true);
   assert.equal(persisted.orders.length, 1, 'Reconciliation must not duplicate LIS orders');
   assert.equal(persisted.orders[0].id, committed.orders[0].id, 'Original LIS order must survive unchanged');
   assert.equal(persisted.operations.length, 1);
@@ -80,11 +80,12 @@ export async function runBlackoutScenario({ request, restart, inspect, stop }) {
   assert.equal(persisted.results.length, 1);
   assert.equal(persisted.chart.length, 1);
   console.log(JSON.stringify({
-    passed: true, runtime: 'real local workerd', restart: 'process-group SIGKILL',
+    passed: true, runtime, restart: 'process-group SIGKILL',
     operationId: completed.id, idempotencyKey: completed.idempotency_key,
     targetResource: completed.target_resource, lisOrders: persisted.orders.length,
     lisResults: persisted.results.length, chartResults: persisted.chart.length,
     finalState: completed.state, wanDisconnected: false,
+    localBucketRestore: runtime === 'real local celld',
   }, null, 2));
 }
 
@@ -111,7 +112,7 @@ function inspectD1(directory, key) {
       entry.isDirectory() ? walk(join(dir,entry.name)) : [join(dir,entry.name)]);
     const rows = {};
     const tableNames = ['lis_orders','lis_results','integration_operations','outbox','demo_chart_results'];
-    for (const path of walk(process.argv[1]).filter(path => path.endsWith('.sqlite'))) {
+    for (const path of walk(process.argv[1]).filter(path => (/\.(sqlite|db)$/.test(path)))) {
       const db = new DatabaseSync(path, {readOnly:true});
       try {
         for (const table of tableNames) {
@@ -135,13 +136,40 @@ function inspectD1(directory, key) {
     operations: data.integration_operations, outbox: data.outbox, chart: data.demo_chart_results };
 }
 
-export async function runWorkerdSmoke() {
+export async function runWorkerdSmoke({ celld } = {}) {
   if (process.platform === 'win32') throw new Error('This process-group restart smoke requires macOS or Linux.');
   const secret = readFileSync(resolve(root, 'apps/worker/.dev.vars'), 'utf8')
     .match(/^DEMO_API_KEY=(.+)$/m)?.[1]?.trim();
   if (!secret) throw new Error('Missing demo token; run npm run dev:secrets first');
   const port = await unusedPort();
   const persistence = mkdtempSync(join(tmpdir(), 'hospital-fabric-restart-'));
+  let project = join(persistence, 'project');
+  if (celld) {
+    mkdirSync(project);
+    for (const file of ['wrangler.jsonc', '.dev.vars', 'dist']) {
+      cpSync(resolve(root, 'apps/worker', file), join(project, file), { recursive: true });
+    }
+    // Test-only wrapper in the temporary project, never in a deployable bundle.
+    // celld can restore newer epochs from its object store while old SQLite
+    // files remain on disk; query the recovered bindings rather than stale files.
+    writeFileSync(join(project, 'smoke.mjs'), `
+      import worker from './dist/index.mjs';
+      export default { ...worker, async fetch(request, env, ctx) {
+        if (new URL(request.url).pathname !== '/__smoke/state') return worker.fetch(request, env, ctx);
+        if (request.headers.get('x-demo-token') !== env.DEMO_API_KEY) return new Response('', {status:401});
+        const data = {};
+        for (const [name, binding] of [['orders','LIS_DB'],['results','LIS_DB'],['operations','DB'],['outbox','DB'],['chart','DB']]) {
+          const table = {orders:'lis_orders',results:'lis_results',operations:'integration_operations',outbox:'outbox',chart:'demo_chart_results'}[name];
+          data[name] = (await env[binding].prepare('SELECT * FROM '+table).all()).results;
+        }
+        return Response.json(data);
+      }};
+    `);
+    const config = JSON.parse(readFileSync(join(project, 'wrangler.jsonc'), 'utf8'));
+    config.main = 'smoke.mjs';
+    writeFileSync(join(project, 'wrangler.jsonc'), JSON.stringify(config));
+  }
+  const runtimeName = celld ? 'real local celld' : 'real local workerd';
   const base = `http://127.0.0.1:${port}`;
   const abort = new AbortController();
   let worker;
@@ -157,6 +185,7 @@ export async function runWorkerdSmoke() {
       body: body === undefined ? undefined : JSON.stringify(body) });
     const result = await response.json();
     if (!response.ok) throw new Error(`${method} ${path} ${response.status}: ${JSON.stringify(result)}`);
+    if (process.env.SMOKE_TRACE) console.log(method, path, JSON.stringify(result));
     return result;
   };
   const stop = async (hard = false) => {
@@ -167,15 +196,39 @@ export async function runWorkerdSmoke() {
       try { process.kill(-current.pid, signal); }
       catch (error) { if (error.code !== 'ESRCH') throw error; }
     };
+    // celld dev supervises its serving node in a separate process group.
+    // Capture only descendants of our launcher before it exits/reparents them.
+    const descendants = celld ? (() => {
+      const rows = execFileSync('ps', ['-axo', 'pid=,ppid='], { encoding: 'utf8' })
+        .trim().split('\n').map(line => line.trim().split(/\s+/).map(Number));
+      const owned = new Set([current.pid]);
+      let changed = true;
+      while (changed) {
+        changed = false;
+        for (const [pid, parent] of rows) if (owned.has(parent) && !owned.has(pid)) {
+          owned.add(pid); changed = true;
+        }
+      }
+      owned.delete(current.pid);
+      return [...owned];
+    })() : [];
+    const killDescendants = signal => {
+      for (const pid of descendants) {
+        try { process.kill(pid, signal); }
+        catch (error) { if (error.code !== 'ESRCH') throw error; }
+      }
+    };
+    killDescendants(hard ? 'SIGKILL' : 'SIGTERM');
     killGroup(hard ? 'SIGKILL' : 'SIGTERM');
     await Promise.race([exited, delay(5000, undefined, { ref: false })]);
     // Kill surviving descendants even if the Wrangler launcher exited already.
+    killDescendants('SIGKILL');
     killGroup('SIGKILL');
     await Promise.race([exited, delay(2000, undefined, { ref: false })]);
-    assert.ok(!current.pid || current.exitCode !== null || current.signalCode !== null, 'Wrangler did not terminate');
+    assert.ok(!current.pid || current.exitCode !== null || current.signalCode !== null, 'Runtime launcher did not terminate');
     worker = undefined;
-    for (let i = 0; i < 20; i++) {
-      const response = await fetch(`${base}/healthz`, { signal: AbortSignal.timeout(250) }).catch(() => null);
+    for (let i = 0; i < 100; i++) {
+      const response = await fetch(`${base}/healthz`, { signal: AbortSignal.timeout(250), headers: { connection: 'close' } }).catch(() => null);
       if (!response) return;
       await delay(100);
     }
@@ -183,12 +236,14 @@ export async function runWorkerdSmoke() {
   };
   const start = async () => {
     abort.signal.throwIfAborted();
-    worker = spawn(process.execPath, [wrangler, 'dev', '--config', 'apps/worker/wrangler.jsonc',
+    const command = celld || process.execPath;
+    const args = celld ? ['dev', project, '--host', '127.0.0.1', '--port', String(port), '--no-watch', '--logs'] : [wrangler, 'dev', '--config', 'apps/worker/wrangler.jsonc',
       '--local', '--ip', '127.0.0.1', '--port', String(port), '--persist-to', persistence,
-      '--inspector-port', '0'], {
+      '--inspector-port', '0'];
+    worker = spawn(command, args, {
       cwd: root, detached: true, stdio: ['ignore', 'pipe', 'pipe'],
       env: { ...process.env, WRANGLER_SEND_METRICS: 'false', WRANGLER_LOG_PATH: join(persistence, 'wrangler.log'),
-        XDG_CONFIG_HOME: join(persistence, 'config'), BROWSER: 'none', CI: '1' },
+        CELLD_ESBUILD: resolve(root, 'node_modules/.bin/esbuild'), XDG_CONFIG_HOME: join(persistence, 'config'), BROWSER: 'none', CI: '1' },
     });
     let spawnError;
     worker.once('error', error => { spawnError = error; });
@@ -199,7 +254,7 @@ export async function runWorkerdSmoke() {
     for (let i = 0; i < 120; i++) {
       abort.signal.throwIfAborted();
       if (spawnError) throw spawnError;
-      if (worker.exitCode !== null || worker.signalCode !== null) throw new Error('Wrangler exited before becoming healthy');
+      if (worker.exitCode !== null || worker.signalCode !== null) throw new Error('Runtime exited before becoming healthy');
       const response = await fetch(`${base}/healthz`, { signal: AbortSignal.timeout(500) }).catch(() => null);
       if (response?.ok) {
         assert.equal((await response.json()).service, 'hospital-fabric');
@@ -207,17 +262,33 @@ export async function runWorkerdSmoke() {
       }
       await delay(500, undefined, { signal: abort.signal });
     }
-    throw new Error('Local workerd did not become healthy within 60 seconds');
+    throw new Error('Local runtime did not become healthy within 60 seconds');
   };
   try {
     await start();
-    await runBlackoutScenario({ request, stop, inspect: key => inspectD1(persistence, key),
+    await runBlackoutScenario({ request, stop, runtime: runtimeName, inspect: async (key, final = false) => {
+      if (!celld || !final) return inspectD1(persistence, key);
+      const restoredProject = join(persistence, 'restored-project');
+      cpSync(project, restoredProject, { recursive: true });
+      // Remove only the copied runtime cache. The original state is untouched.
+      // Restore from a stopped backup of the authoritative local object store.
+      rmSync(join(restoredProject, '.celld/dev/runtime'), { recursive: true, force: true });
+      project = restoredProject;
+      console.log('Restoring completed workflow from a copied local bucket with empty runtime cache.');
+      await start();
+      try {
+        const state = await request('GET', '/__smoke/state');
+        assert.ok(state.orders.every(order => order.idempotency_key === key));
+        assert.equal((await request('GET', '/v1/operations/' + state.operations[0].id)).operation.state, 'completed');
+        return state;
+      } finally { await stop(); }
+    },
       restart: async inspectWhileStopped => {
         await stop(true);
         console.log('Runtime terminated; HTTP unavailable. Reading persisted D1 before restart.');
-        inspectWhileStopped();
+        await inspectWhileStopped();
         await start();
-        console.log('New workerd process started against the same persisted D1 databases.');
+        console.log(`New ${runtimeName} process started against the same persisted D1 databases.`);
       } });
   } catch (error) {
     console.error(logs.replaceAll(secret, '[REDACTED]'));
@@ -227,11 +298,12 @@ export async function runWorkerdSmoke() {
     finally {
       process.removeListener('SIGINT', signalHandler);
       process.removeListener('SIGTERM', signalHandler);
-      rmSync(persistence, { recursive: true, force: true });
+      if (process.env.SMOKE_KEEP_STATE) console.log('Retained smoke state:', persistence);
+      else rmSync(persistence, { recursive: true, force: true });
     }
   }
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  await runWorkerdSmoke();
+  await runWorkerdSmoke({ celld: process.env.CELLD_BIN });
 }
