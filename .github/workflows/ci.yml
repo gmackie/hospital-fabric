@@ -25,4 +25,9 @@ jobs:
         run: npx playwright install --with-deps chromium
       - name: Test operator console in Chromium
         run: npm run test:console
-      # Follow-up: install pinned forgec, run forgec check forge, and add an actual celld smoke test.
+      - name: Install checksum-pinned celld and Forge compiler
+        run: npm run tools:validation
+      - name: Validate Forge model and isolated generated D1 schema
+        run: npm run check:forge
+      - name: Smoke test celld crash and persistent recovery
+        run: npm run smoke:celld

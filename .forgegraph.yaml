@@ -1,0 +1,2 @@
+# Registry identity only; existing Wrangler and private host deployment remain authoritative.
+app: hospital-fabric

@@ -20,7 +20,10 @@
     "dev:demo": "npm run build && wrangler dev --config apps/worker/wrangler.demo.jsonc --local",
     "deploy:demo": "npm run build && wrangler d1 migrations apply DB --config apps/worker/wrangler.demo.jsonc --remote && wrangler d1 migrations apply LIS_DB --config apps/worker/wrangler.demo.jsonc --remote && wrangler deploy --config apps/worker/wrangler.demo.jsonc",
     "test:real-contracts": "node --test tests/real-adapters.test.mjs",
-    "probe:real": "node scripts/probe-real-services.mjs"
+    "probe:real": "node scripts/probe-real-services.mjs",
+    "smoke:celld": "npm run build && npm run dev:secrets && CELLD_BIN=${CELLD_BIN:-./.validation-tools/bin/celld} node scripts/smoke-workerd.mjs",
+    "tools:validation": "python3 scripts/install-validation-tools.py",
+    "check:forge": "python3 scripts/check-forge.py"
   },
   "dependencies": {
     "effect": "4.0.2",
