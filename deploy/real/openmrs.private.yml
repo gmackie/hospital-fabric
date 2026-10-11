@@ -1,0 +1,16 @@
+# Docker Compose 2.24.4+; apply AFTER official 3.7.1 docker-compose.yml.
+services:
+  gateway:
+    image: ${OMRS_GATEWAY_IMAGE:?Set a verified image digest}
+    ports: !override ["127.0.0.1:8090:80"]
+  frontend:
+    image: ${OMRS_FRONTEND_IMAGE:?Set a verified image digest}
+  backend:
+    image: ${OMRS_BACKEND_IMAGE:?Set a verified image digest}
+    environment:
+      OMRS_CONFIG_CONNECTION_PASSWORD: ${OMRS_DB_PASSWORD:?Set a private deployment password}
+  db:
+    image: ${OMRS_DATABASE_IMAGE:?Set a verified image digest}
+    environment:
+      MYSQL_PASSWORD: ${OMRS_DB_PASSWORD:?Set a private deployment password}
+      MYSQL_ROOT_PASSWORD: ${OMRS_ROOT_PASSWORD:?Set a private deployment password}

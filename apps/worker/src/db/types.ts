@@ -22,5 +22,6 @@ export interface Env {
   PUBLIC_DEMO?: string;
   DEMO_RATE_LIMITER?: { limit(input: { key: string }): Promise<{ success: boolean }> };
   DEMO_API_KEY?: string;
+  REAL_DEMO_BRIDGE_TOKEN?: string;
   ALLOW_DEV_BOOTSTRAP?: string;
 }

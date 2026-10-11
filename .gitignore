@@ -12,3 +12,6 @@ apps/worker/.env.local
 apps/worker/src/generated/console.ts
 test-results/
 playwright-report/
+
+__pycache__/
+*.pyc

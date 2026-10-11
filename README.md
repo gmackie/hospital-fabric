@@ -4,11 +4,15 @@
 
 The prototype includes a bundled React operator console and a real workerd restart/recovery acceptance harness. See [the blackout demo guide](docs/BLACKOUT-DEMO.md) for the interactive workflow and boundaries.
 
-The first slice demonstrates durable order delivery between a synthetic OpenMRS-like order source and an independently persisted simulated LIS. Both data stores are SQLite-backed D1 bindings. This code doesn't run real OpenMRS or OpenELIS; those remain future adapters and separate clinical applications.
+The first slice demonstrates durable order delivery between a synthetic OpenMRS-like order source and an independently persisted simulated LIS. Both data stores are SQLite-backed D1 bindings. The public walkthrough uses those simulators. A separate fixed synthetic hemoglobin workflow now runs through private OpenMRS/OpenELIS services on hetzner-master, with verified result return and a refreshable proof card at med.gmac.io. See [the host runbook](docs/HETZNER-MASTER.md).
 
 ## Public cloud demo
 
 The public interactive synthetic walkthrough is hosted at [med.gmac.io](https://med.gmac.io) on Cloudflare Workers with two independent D1 databases. It demonstrates order delivery, a lost acknowledgment, reconciliation, and result import. No token is needed for that isolated public walkthrough. The token-based operator console in this PR is served only when `PUBLIC_DEMO` is not enabled and is not deployed by this change. See [cloud deployment and verification](docs/CLOUD-DEMO.md).
+
+## Real-service integration preparation
+
+Private OpenMRS/OpenELIS deployment overlays, read-only probes and guarded FHIR protocol clients are prepared in [the real-services guide](docs/REAL-SERVICES.md). They are not enabled in the public demo and have not been tested against running product instances. That guide records the exact deployment and end-to-end gates before enabling a real synthetic workflow.
 
 ## Prerequisites
 

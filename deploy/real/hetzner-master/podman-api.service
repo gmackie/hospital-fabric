@@ -1,0 +1,20 @@
+[Unit]
+Description=Hospital Fabric isolated Podman API
+RequiresMountsFor=/mnt/master-apps/hospital-fabric
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+Delegate=yes
+RuntimeDirectory=hospital-fabric
+RuntimeDirectoryMode=0700
+RuntimeDirectoryPreserve=yes
+Environment=XDG_RUNTIME_DIR=/run/hospital-fabric/runtime
+ExecStartPre=/usr/bin/mkdir -p /run/hospital-fabric/runtime
+ExecStart=/usr/bin/podman --root=/mnt/master-apps/hospital-fabric/containers --runroot=/run/hospital-fabric/storage --runtime=runc system service --time=0 unix:/run/hospital-fabric/podman.sock
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

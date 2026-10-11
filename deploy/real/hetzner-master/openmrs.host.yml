@@ -1,0 +1,17 @@
+services:
+  gateway:
+    entrypoint: ["/bin/sh", "/hf-gateway.sh"]
+    volumes:
+      - /mnt/master-apps/hospital-fabric/release/deploy/real/hetzner-master/openmrs-gateway.sh:/hf-gateway.sh:ro
+    ports: !override ["127.0.0.1:18090:80"]
+  backend:
+    mem_limit: 3g
+    cpus: 2
+    environment:
+      OMRS_CONFIG_ADMIN_USER_PASSWORD: ${OMRS_ADMIN_PASSWORD:?Private admin password required}
+      OMRS_JAVA_MEMORY_OPTS: "-Xms256m -Xmx2048m"
+volumes:
+  openmrs-data:
+    driver_opts: {type: none, o: bind, device: /mnt/master-apps/hospital-fabric/data/openmrs-app}
+  db-data:
+    driver_opts: {type: none, o: bind, device: /mnt/master-apps/hospital-fabric/data/openmrs-db}
