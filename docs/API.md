@@ -45,3 +45,7 @@ All `v1` endpoints in this repository are **synthetic/demo-only**, require `x-de
 * `jobs/results.ts`: synthetic inbound result correlation, deduplication and projections.
 
 Separate queue consumers, Durable Objects and Effect persisted workflows may be added later *behind these same domain interfaces*. Do not add multiple authoritative owners for the same order state.
+
+## Public connected hospital
+
+`/hospital/api/session`, `/hospital/api/state` and `/hospital/api/commands` use visitor cookies and fixed synthetic inputs. See [the hospital API contract](HOSPITAL-SIMULATION.md). Cloud `/` serves this UI; `/delivery-lab` preserves the original integration walkthrough.

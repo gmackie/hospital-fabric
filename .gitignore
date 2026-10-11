@@ -17,3 +17,5 @@ __pycache__/
 *.pyc
 
 .validation-tools/
+
+apps/worker/src/generated/hospital.ts

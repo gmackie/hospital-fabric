@@ -18,6 +18,7 @@
   "include": [
     "apps/worker/src/**/*.ts",
     "apps/console/src/**/*.tsx",
-    "apps/console/src/**/*.ts"
+    "apps/console/src/**/*.ts",
+    "apps/hospital/src/**/*.tsx"
   ]
 }
