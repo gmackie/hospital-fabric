@@ -85,6 +85,7 @@ export async function runBlackoutScenario({ request, restart, inspect, stop, run
     targetResource: completed.target_resource, lisOrders: persisted.orders.length,
     lisResults: persisted.results.length, chartResults: persisted.chart.length,
     finalState: completed.state, wanDisconnected: false,
+    localBucketRestore: runtime === 'real local celld',
   }, null, 2));
 }
 
@@ -142,7 +143,7 @@ export async function runWorkerdSmoke({ celld } = {}) {
   if (!secret) throw new Error('Missing demo token; run npm run dev:secrets first');
   const port = await unusedPort();
   const persistence = mkdtempSync(join(tmpdir(), 'hospital-fabric-restart-'));
-  const project = join(persistence, 'project');
+  let project = join(persistence, 'project');
   if (celld) {
     mkdirSync(project);
     for (const file of ['wrangler.jsonc', '.dev.vars', 'dist']) {
@@ -267,6 +268,13 @@ export async function runWorkerdSmoke({ celld } = {}) {
     await start();
     await runBlackoutScenario({ request, stop, runtime: runtimeName, inspect: async (key, final = false) => {
       if (!celld || !final) return inspectD1(persistence, key);
+      const restoredProject = join(persistence, 'restored-project');
+      cpSync(project, restoredProject, { recursive: true });
+      // Remove only the copied runtime cache. The original state is untouched.
+      // Restore from a stopped backup of the authoritative local object store.
+      rmSync(join(restoredProject, '.celld/dev/runtime'), { recursive: true, force: true });
+      project = restoredProject;
+      console.log('Restoring completed workflow from a copied local bucket with empty runtime cache.');
       await start();
       try {
         const state = await request('GET', '/__smoke/state');

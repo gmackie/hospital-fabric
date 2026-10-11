@@ -59,7 +59,7 @@ For an already installed Chromium executable, set `PLAYWRIGHT_CHROMIUM_EXECUTABL
 
 ## Remaining acceptance work
 
-- Pinned celld 0.6.2 now passes the same workflow: run `npm run tools:validation` then `npm run smoke:celld`. It uses isolated temporary storage and a test-only inspection wrapper to verify completed state after another restart.
+- Pinned celld 0.6.2 now passes the same workflow: run `npm run tools:validation` then `npm run smoke:celld`. It uses isolated temporary storage and a test-only inspection wrapper to verify completed state after restoring a stopped local bucket backup with an empty runtime cache.
 - Pinned `gmackie/forgec` 0.5.0 now checks/builds the draft: run `npm run check:forge`. Generated SQL is validated in isolation; the manual schema remains the sole live owner. See [the migration gaps](WEEKEND-ACCEPTANCE.md).
 - Run the physical WAN-disconnection/LAN-intact exercise, then backup/restore and power-loss testing in a representative environment.
 - Qualify real adapters, security, clinical authority, terminology and operating procedures before considering any real data. See [production blockers](PRODUCTION.md).
