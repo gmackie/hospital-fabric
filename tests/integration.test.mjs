@@ -370,3 +370,28 @@ test('real demo bridge accepts only authenticated fixed synthetic projections',a
  assert.equal(await env.DB.prepare('SELECT count(*) AS n FROM real_demo_evidence').first().then(x=>x.n),1);
  env.DB.close();env.LIS_DB.close();
 });
+
+test('unkeyed result intake advances past the first 25 released results (HF-8)',async()=>{
+  const {env,call}=await initialize();
+  try {
+    const p=await call('POST','/v1/demo/patients',{label:'SYNTHETIC-INTAKE-CURSOR'});
+    const ids=[];
+    for (let n=0;n<30;n++) {
+      const order=await call('POST','/v1/demo/lab-orders',{patientId:p.body.id,testCode:['CBC','BMP','GLUCOSE'][n%3],requestId:`intake-cursor-${String(n).padStart(3,'0')}`});
+      ids.push(order.body.operationId);
+    }
+    for (let n=0;n<4&&(await env.DB.prepare("SELECT count(*) AS n FROM integration_operations WHERE state='accepted'").first()).n<30;n++) await call('POST','/v1/admin/tick');
+    let imported=0;
+    for (const [n,id] of ids.entries()) {
+      const released=await call('POST',`/v1/demo/lis/orders/${id}/release`,{resultText:`SYNTHETIC: ${n}`,unitCode:'10^9/L'});
+      assert.equal(released.status,200,JSON.stringify(released));
+      // Interleave polls so earlier results are already imported when later ones arrive.
+      if (n%7===6) imported+=(await call('POST','/v1/admin/tick')).body.results.processed;
+    }
+    for (let n=0;n<3;n++) imported+=(await call('POST','/v1/admin/tick')).body.results.processed;
+    assert.equal(imported,30);
+    assert.equal((await env.DB.prepare("SELECT count(*) AS n FROM integration_operations WHERE state='completed'").first()).n,30);
+    assert.equal((await env.DB.prepare('SELECT count(*) AS n FROM demo_chart_results').first()).n,30);
+    assert.equal((await call('POST','/v1/admin/tick')).body.results.processed,0);
+  } finally {env.DB.close();env.LIS_DB.close();}
+});
