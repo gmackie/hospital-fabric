@@ -31,6 +31,13 @@ test('OpenMRS returns exactly one synthetic identifier match',async()=>{
  assert.equal((await readSyntheticOpenMrsPatient(c,'urn:hf','HF-SYNTH-1')).id,'p');
  await assert.rejects(readSyntheticOpenMrsPatient(c,'urn:hf','real-patient'));
 });
+test('OpenMRS identifier-type search compatibility still requires the exact returned URI',async()=>{
+ let query;
+ const c=client(async url=>{query=new URL(url).searchParams.get('identifier');return json({resourceType:'Bundle',total:1,entry:[{resource:{resourceType:'Patient',id:'p',identifier:[{system:'urn:hf',value:'HF-SYNTH-1'}]}}]});});
+ assert.equal((await readSyntheticOpenMrsPatient(c,'urn:hf','HF-SYNTH-1',{searchSystem:'Hospital Fabric Synthetic'})).id,'p');
+ assert.equal(query,'Hospital Fabric Synthetic|HF-SYNTH-1');
+ await assert.rejects(readSyntheticOpenMrsPatient(c,'urn:other','HF-SYNTH-1',{searchSystem:'Hospital Fabric Synthetic'}));
+});
 test('OpenMRS rejects fuzzy, duplicate and paginated identity matches',async()=>{
  for(const body of [{total:2,entry:[{resource:patient},{resource:patient}]},{total:1,entry:[{resource:patient}]},{entry:[{resource:patient}],link:[{relation:'next'}]}]) {
   await assert.rejects(readSyntheticOpenMrsPatient(client(async()=>json({resourceType:'Bundle',...body})),'urn:hf','HF-SYNTH-1'));

@@ -39,6 +39,40 @@ services:
       - /mnt/master-apps/hospital-fabric/release/deploy/real/hetzner-master/openelis-proxy.sh:/hf-proxy.sh:ro
       - /mnt/master-apps/hospital-fabric/private/ca.crt:/etc/nginx/hf-ca.crt:ro
     ports: !override ["127.0.0.1:18092:80", "127.0.0.1:18443:443"]
+  source-db:
+    image: ${OE_DATABASE_IMAGE:?Pinned source database image required}
+    container_name: hf-openelis-source-database
+    restart: unless-stopped
+    env_file: [./volume/database/database.env]
+    environment:
+      POSTGRES_PASSWORD: ${OE_POSTGRES_PASSWORD:?Private database owner password required}
+      DB_PASSWORD: ${OE_DB_PASSWORD:?Private database password required}
+      DB_SUPERUSER_PASSWORD: ${ADMIN_PASSWORD:?Private database admin password required}
+    volumes: [source-db-data:/var/lib/postgresql/data]
+    healthcheck:
+      test: [CMD, pg_isready, -q, -d, clinlims, -U, clinlims]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+  hf-source-fhir:
+    image: ${OE_FHIR_IMAGE:?Pinned source FHIR image required}
+    container_name: hf-openelis-source-fhir
+    restart: unless-stopped
+    depends_on: [source-db]
+    ports: ["127.0.0.1:18093:8080"]
+    mem_limit: 1536m
+    cpus: 2
+    volumes:
+      - key_trust-store-volume:/etc/openelis-global
+      - /mnt/master-apps/hospital-fabric/private/fhir-server.xml:/usr/local/tomcat/conf/server.xml:ro
+    environment:
+      JAVA_TOOL_OPTIONS: "-Xms128m -Xmx1024m"
+      CATALINA_OPTS: "-Dhapi.ssl.truststorepath=/etc/openelis-global/truststore -Dhapi.ssl.truststorepassword=${SSL_TRUSTSTORE_PASSWORD} -Dhapi.ssl.keystorepath=/etc/openelis-global/keystore -Dhapi.ssl.keystorepassword=${SSL_KEYSTORE_PASSWORD}"
+      FHIR_DATASOURCE_URL: "jdbc:postgresql://source-db:5432/clinlims?currentSchema=clinlims"
+      FHIR_DATASOURCE_USERNAME: clinlims
+      FHIR_DATASOURCE_PASSWORD: ${OE_DB_PASSWORD:?Private database password required}
+      FHIR_SERVER_ADRESS: "http://hf-source-fhir:8080/fhir/"
+      HAPI_FHIR_CLIENT_ID_STRATEGY: "ANY"
 networks:
   default:
     ipam: !reset null
@@ -53,3 +87,5 @@ volumes:
     driver_opts: {type: none, o: bind, device: /mnt/master-apps/hospital-fabric/data/openelis-keys}
   reporting-data:
     driver_opts: {type: none, o: bind, device: /mnt/master-apps/hospital-fabric/data/openelis-reports}
+  source-db-data:
+    driver_opts: {type: none, o: bind, device: /mnt/master-apps/hospital-fabric/data/openelis-source-db}

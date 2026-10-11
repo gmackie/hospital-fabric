@@ -13,7 +13,8 @@ Only loopback ports are published:
 | Product | Local address |
 | --- | --- |
 | OpenMRS O3 / REST / FHIR2 | `http://127.0.0.1:18090` |
-| OpenELIS HAPI R4 | `http://127.0.0.1:18091/fhir` |
+| Order source HAPI R4 | `http://127.0.0.1:18093/fhir` |
+| OpenELIS result HAPI R4 | `http://127.0.0.1:18091/fhir` |
 | OpenELIS HTTP redirect | `http://127.0.0.1:18092` |
 | OpenELIS UI/API | `https://localhost:18443` |
 
@@ -51,7 +52,7 @@ python3 "$base/verify-openelis-access.py"
 python3 "$base/status.py"
 ```
 
-`probe.mjs` reads private authorization on the host and stores sanitized FHIR R4 capability evidence. `conditional-conformance.mjs` creates synthetic fixtures with an owner excluded from the laboratory polling queue, checks an accepted Task remains unchanged on replay, and verifies concurrent replay returns one order pair. Test fixtures remain in this synthetic store for audit. `conformance.mjs` retains the negative test for the rejected transaction PUT strategy; it is expected to fail on HAPI 6.6.0 and must never enable the adapter gate.
+`probe.mjs` checks the private authenticated OpenMRS REST session before FHIR metadata, and stores sanitized capability evidence for OpenMRS and both HAPI stores. Anonymous metadata alone does not verify authentication. `conditional-conformance.mjs` creates synthetic fixtures with an owner excluded from the laboratory polling queue, checks an accepted Task remains unchanged on replay, and verifies concurrent replay returns one order pair. Test fixtures remain in this synthetic store for audit. `conformance.mjs` retains the negative test for the rejected transaction PUT strategy; it is expected to fail on HAPI 6.6.0 and must never enable the adapter gate.
 
 `verify-openelis-access.py` verifies a private application password and rotates the packaged initial password through the product password-change API when needed; the database superuser password is a separate credential. An environment variable alone does not configure the OpenELIS application administrator.
 
@@ -59,7 +60,9 @@ First OpenMRS startup imports the full upstream catalog. Thread samples showed O
 
 ## Synthetic laboratory fixture
 
-Run `configure-lab.py` to map the installed active whole-blood hemoglobin test to LOINC `718-7` through authenticated catalog APIs, preserving other terminology. Run `lab-order.mjs` to stage one durable synthetic order, then rerun it to reconcile without resubmitting. The fixture/correlation record remains in `private/lab-order.json`. OpenELIS imports patient/provider references as UUIDs, so the adapter requires UUIDs for these references. The polling owner is a host-configured UUID Practitioner, not a display-name ID. Confirm exactly one Electronic Order through the application API before accession/result entry.
+Run `openmrs-patient.mjs` to register/reconcile a generated identity. It obtains required OpenMRS IDs through the supported idgen API and retains their allocation before registration. The packaged database can retain its legacy admin credential despite the configured installation password; the script rotates that verified initial credential through the user REST API. Run `configure-openmrs-identity.py`, restart the backend, then rerun registration to verify the exact FHIR system/identifier match. The supported Initializer CSV supplies `https://med.gmac.io/identifier/synthetic`.
+
+Run `configure-lab.py` to map the installed active whole-blood hemoglobin test to LOINC `718-7` through authenticated catalog APIs, preserving other terminology. Run `lab-order.mjs` to stage one durable synthetic order, then rerun it to reconcile without resubmitting. The fixture/correlation record remains in `private/lab-order-source.json`; the earlier rejected co-resident fixture remains in `private/lab-order.json`. OpenELIS imports patient/provider references as UUIDs, so the adapter requires UUIDs for these references. The polling owner is a host-configured UUID Practitioner, not a display-name ID. Confirm exactly one Electronic Order through the application API before accession/result entry. The pinned Electronic Orders identifier search lowercases stored IDs but leaves search inputs unchanged; use a lowercase search token, then compare the returned external ID exactly to the persisted original. This does not change the order identifier.
 
 ## Restart, TLS and persistence
 
@@ -71,6 +74,6 @@ Leaf TLS expires after 90 days; CA after 365 days. The provisioning marker preve
 
 HAPI metadata and trusted OpenELIS UI HTTPS have passed. Conditional creation/replay passed on HAPI 6.6.0. OpenELIS private administrator login and the actual adapter replay/reconciliation probe have also passed. The hemoglobin catalog mapping (LOINC `718-7`) is configured and one generated order is visible in Electronic Orders as `AwaitingSpecimen`. Its Task is `rejected`, and co-resident import logged a stale-version HTTP 409 while updating the same Task through source and local clients. These product states disagree; do not treat this as accepted or completed. The specimen-selection workflow and source/result topology need resolution before another order is sent.
 
-OpenMRS has completed the OCL imports and is still generating the distribution’s demo visits; patient/visit counts advance but authenticated readiness remains unverified. Synthetic registration, Electronic Order acceptance, verified result return to OpenMRS, and a bounded public bridge still require runtime evidence. A test writing Task `accepted` is transport conformance, not laboratory acceptance.
+OpenMRS completed initialization and private password rotation; authenticated REST readiness is verified. One synthetic patient is registered with a generated required OpenMRS ID. Exact FHIR system/identifier verification passed after the Initializer mapping reload. Pinned FHIR2 searches token systems by identifier-type name; the explicit adapter compatibility option retains strict returned URI/value verification. Separate source HAPI readiness and UUID receipt/replay reconciliation are verified; source polling has been moved away from the co-resident store. A new UUID-based order transitioned to accepted through the product importer; accession and result return remain pending. Synthetic registration, Electronic Order acceptance, verified result return to OpenMRS, and a bounded public bridge still require runtime evidence. A test writing Task `accepted` is transport conformance, not laboratory acceptance.
 
 HF-3 remains open until its workflow acceptance criteria pass. ForgeGraph has no enrolled `hospital-fabric` application, so deployment evidence/status synchronization is tracked separately in HF-2; GitHub merge alone must not close production work.

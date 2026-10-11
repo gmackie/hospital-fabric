@@ -3,7 +3,7 @@ import {writeFileSync} from 'node:fs';
 import {randomUUID} from 'node:crypto';
 const base='/mnt/master-apps/hospital-fabric';
 const {FhirClient}=await import(base+'/release/probe-client.mjs');
-const client=new FhirClient({baseUrl:'http://127.0.0.1:18091/fhir'});
+const client=new FhirClient({baseUrl:'http://127.0.0.1:18093/fhir'});
 const key=randomUUID(), local='hf-conditional-'+key, order='HF-SYNTH-'+key;
 const system='https://hospital-fabric.example/synthetic-order';
 const fullUrl='urn:uuid:'+randomUUID();

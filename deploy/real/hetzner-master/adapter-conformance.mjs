@@ -3,7 +3,7 @@ import {randomUUID} from 'node:crypto';
 import {writeFileSync} from 'node:fs';
 const base='/mnt/master-apps/hospital-fabric';
 const {FhirClient,stageOpenElisTask,reconcileOpenElisTask}=await import(base+'/release/probe-client.mjs');
-const client=new FhirClient({baseUrl:'http://127.0.0.1:18091/fhir'});
+const client=new FhirClient({baseUrl:'http://127.0.0.1:18093/fhir'});
 const uuid=randomUUID(),id=uuid,ownerId=randomUUID();
 const input={taskId:'task-'+uuid,requestId:'request-'+uuid,patientId:id,ownerId,patientIdentifierSystem:'http://openelis-global.org/pat_nationalId',patientIdentifier:'HF-SYNTH-'+uuid,orderNumber:'HF-SYNTH-'+uuid,loincCode:'718-7',authoredOn:new Date().toISOString()};
 const evidence={checkedAt:new Date().toISOString(),host:'hetzner-master',scope:'actual adapter staging and lost-receipt reconciliation; not lab acceptance',passed:false};
