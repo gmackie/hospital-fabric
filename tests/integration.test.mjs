@@ -293,7 +293,7 @@ test('public walkthrough isolates visitors, rejects cross-origin writes and deli
   } finally {env.DB.close();env.LIS_DB.close();}
 });
 
-test('public demo mode preserves its walkthrough and denies local-console assets',async()=>{
+test('public hospital landing preserves delivery walkthrough and denies local-console assets',async()=>{
   const {env,call}=await initialize();
   const worker=(await import('../apps/worker/dist/index.mjs')).default;
   try {
@@ -302,7 +302,10 @@ test('public demo mode preserves its walkthrough and denies local-console assets
     const root=await worker.fetch(new Request('https://med.gmac.io/'),env);
     assert.equal(root.status,200);
     const html=await root.text();
-    assert.match(html,/Your integration walkthrough/);
+    assert.match(html,/\/hospital.js/);
+    const lab=await worker.fetch(new Request('https://med.gmac.io/delivery-lab'),env);
+    assert.equal(lab.status,200);
+    assert.match(await lab.text(),/Your integration walkthrough/);
     assert.doesNotMatch(html,/\/console\.js|Local demo token/);
     for (const path of ['/console.js','/console.css']) {
       for (const headers of [{},{'x-demo-token':env.DEMO_API_KEY}]) {
@@ -347,7 +350,7 @@ test('public walkthrough recovers crashed dispatching leases without stealing ac
     assert.equal(recovered.operation.attempts,lost.operation.attempts+1);
     assert.equal((await env.LIS_DB.prepare('SELECT count(*) n FROM lis_orders').first()).n,1);
     assert.equal(recovered.events.filter(e=>e.event_type==='delivery.reconciled').length,1);
-    const page=await worker.fetch(new Request('https://med.gmac.io/'),env);
+    const page=await worker.fetch(new Request('https://med.gmac.io/delivery-lab'),env);
     assert.match(await page.text(),/Check delivery recovery/);
   } finally {env.DB.close();env.LIS_DB.close();}
 });

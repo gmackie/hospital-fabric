@@ -180,3 +180,27 @@ test('untrusted timeline and result strings render as text under the Worker CSP'
   await expect(selected(page).locator('img')).toHaveCount(0);
   expect(await page.evaluate(() => window.__consoleXss)).toBeUndefined();
 });
+
+test('hospital simulation completes medical and surgical journeys, survives reload and queues outage summaries', async ({ page, context }) => {
+  await page.goto('/hospital');
+  await expect(page.getByRole('heading',{name:'A hospital, in motion.'})).toBeVisible();
+  const encounter=page.getByRole('region',{name:'Selected encounter'});
+  await page.getByRole('button',{name:'Simulate WAN outage',exact:true}).click();
+  for(const label of ['Register patient','Request laboratory','Deliver lab order','Reconcile acknowledgment','Release lab result','Allocate ward bed','Complete ward stay','Dispense & discharge']){
+    await encounter.getByRole('button',{name:label+' →',exact:true}).click();
+  }
+  await expect(encounter.getByRole('button',{name:'Journey completed →'})).toBeDisabled();
+  await expect(page.getByRole('region',{name:'Hospital status'})).toContainText('1 summaries awaiting WAN');
+  await page.reload();await expect(encounter.getByRole('button',{name:'Journey completed →'})).toBeDisabled();
+  await page.getByRole('button',{name:/RD Robin Demo/}).click();
+  for(const label of ['Register patient','Request laboratory','Deliver lab order','Reconcile acknowledgment','Release lab result','Complete imaging','Allocate ward bed','Book theatre','Complete procedure','Complete recovery','Dispense & discharge']){
+    await encounter.getByRole('button',{name:label+' →',exact:true}).click();
+  }
+  await expect(encounter).toContainText('Synthetic study');
+  await expect(page.getByRole('region',{name:'Hospital status'})).toContainText('2 summaries awaiting WAN');
+  await page.getByRole('button',{name:'Restore WAN',exact:true}).click();
+  await expect(page.getByRole('region',{name:'Hospital status'})).toContainText('0 summaries awaiting WAN');
+  await page.setViewportSize({width:390,height:844});
+  await expect(page.getByRole('heading',{name:'A hospital, in motion.'})).toBeVisible();
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
+});

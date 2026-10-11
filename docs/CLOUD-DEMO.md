@@ -1,6 +1,6 @@
 # Public Cloudflare demo
 
-The public synthetic integration lab runs at https://med.gmac.io using one Cloudflare Worker and two independent D1 databases. celld remains a local option and is not required for the cloud demo.
+The connected hospital simulation runs at https://med.gmac.io; the original synthetic integration lab and real-product proof remain at `/delivery-lab`. Both use one Cloudflare Worker and two independent D1 databases. celld remains a local option and is not required for the cloud demo.
 
 ## Deploy and verify
 

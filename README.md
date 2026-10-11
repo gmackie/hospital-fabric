@@ -6,9 +6,13 @@ The prototype includes a bundled React operator console and a real workerd resta
 
 The first slice demonstrates durable order delivery between a synthetic OpenMRS-like order source and an independently persisted simulated LIS. Both data stores are SQLite-backed D1 bindings. The public walkthrough uses those simulators. A separate fixed synthetic hemoglobin workflow now runs through private OpenMRS/OpenELIS services on hetzner-master, with verified result return and a refreshable proof card at med.gmac.io. See [the host runbook](docs/HETZNER-MASTER.md).
 
+## Connected hospital simulation
+
+The public landing page now simulates registration, emergency/outpatient assessment, labs, imaging, wards, theatre, pharmacy and discharge with shared patient journeys, queues, beds and stock. Simulated WAN outages queue discharge summaries while local work continues. See [the hospital model and limits](docs/HOSPITAL-SIMULATION.md).
+
 ## Public cloud demo
 
-The public interactive synthetic walkthrough is hosted at [med.gmac.io](https://med.gmac.io) on Cloudflare Workers with two independent D1 databases. It demonstrates order delivery, a lost acknowledgment, reconciliation, and result import. No token is needed for that isolated public walkthrough. The token-based local operator console is served only when `PUBLIC_DEMO` is not enabled and is not deployed publicly. See [cloud deployment and verification](docs/CLOUD-DEMO.md).
+The public interactive synthetic walkthrough is hosted at [med.gmac.io](https://med.gmac.io) on Cloudflare Workers with two independent D1 databases. It demonstrates order delivery, a lost acknowledgment, reconciliation, and result import. The delivery walkthrough and real-product proof are at `/delivery-lab`; no token is needed for public simulations. The token-based local operator console is served only when `PUBLIC_DEMO` is not enabled and is not deployed publicly. See [cloud deployment and verification](docs/CLOUD-DEMO.md).
 
 ## Real-service synthetic integration
 

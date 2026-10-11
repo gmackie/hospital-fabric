@@ -1,3 +1,5 @@
+import { HOSPITAL_HTML, HOSPITAL_JS, HOSPITAL_CSS } from '../generated/hospital';
+import { hospitalApi } from '../hospital/api';
 import { realDemo } from '../demo/real';
 import { publicDemo } from '../demo/api';
 import { demoPage } from '../demo/page';
@@ -10,7 +12,7 @@ import { releaseSimulatedResult } from '../adapters/lis-simulator';
 import { runDispatchBatch, reconcileOperation } from '../jobs/dispatch';
 import { pollResults } from '../jobs/results';
 import { CONSOLE_HTML, CONSOLE_JS, CONSOLE_CSS } from '../generated/console';
-import { CORE_MIGRATION, OPERATIONS_MIGRATION, PUBLIC_DEMO_MIGRATION, REAL_DEMO_MIGRATION, LIS_MIGRATION } from '../generated/migrations';
+import { CORE_MIGRATION, OPERATIONS_MIGRATION, PUBLIC_DEMO_MIGRATION, REAL_DEMO_MIGRATION, HOSPITAL_MIGRATION, LIS_MIGRATION } from '../generated/migrations';
 
 const json = (body: unknown,status=200) => Response.json(body,{status,headers:{'cache-control':'no-store'}});
 const noStore = { 'cache-control':'no-store' };
@@ -44,6 +46,8 @@ export async function serve(request:Request,env:Env):Promise<Response> {
   const asset = path==='/' ? [CONSOLE_HTML,'text/html; charset=utf-8'] :
     path==='/console.js' ? [CONSOLE_JS,'text/javascript; charset=utf-8'] :
     path==='/console.css' ? [CONSOLE_CSS,'text/css; charset=utf-8'] : null;
+  const hospitalAsset = path==='/hospital'||path==='/hospital/'||(path==='/'&&env.PUBLIC_DEMO==='1') ? [HOSPITAL_HTML,'text/html; charset=utf-8'] : path==='/hospital.js' ? [HOSPITAL_JS,'text/javascript; charset=utf-8'] : path==='/hospital.css' ? [HOSPITAL_CSS,'text/css; charset=utf-8'] : null;
+  if(method==='GET' && hospitalAsset) return new Response(hospitalAsset[0], {headers:{'content-type':hospitalAsset[1]!, 'cache-control':'no-store', 'x-content-type-options':'nosniff', 'referrer-policy':'no-referrer', 'content-security-policy':"default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'"}});
   if (env.PUBLIC_DEMO==='1' && (path==='/console.js' || path==='/console.css')) return json({code:'not_found'},404);
   if (env.PUBLIC_DEMO!=='1' && method==='GET' && asset) return new Response(asset[0], {headers:{
     'content-type':asset[1]!, 'cache-control':'no-store', 'x-content-type-options':'nosniff',
@@ -53,9 +57,10 @@ export async function serve(request:Request,env:Env):Promise<Response> {
   if (method==='GET' && path==='/healthz') return json({ok:true,service:'hospital-fabric',mode:'synthetic-only'});
   if (method==='OPTIONS') return new Response(null,{status:204,headers:noStore});
   try {
-    if (env.PUBLIC_DEMO==='1' && method==='GET' && path==='/') return demoPage();
+    if (method==='GET' && path==='/delivery-lab') return env.PUBLIC_DEMO==='1' ? demoPage() : Response.redirect(new URL('/',url).href,302);
     if (env.PUBLIC_DEMO==='1' && ((method==='GET' && path==='/demo/api/real') || path==='/internal/demo/real-evidence')) return await realDemo(request,env);
     if (env.PUBLIC_DEMO==='1' && path.startsWith('/demo/api/')) return await publicDemo(request,env);
+    if(path.startsWith('/hospital/api/')) return await hospitalApi(request,env);
     requireAuth(request,env);
     if (method==='POST' && path==='/v1/admin/bootstrap') {
       requireDemoBootstrap(env);
@@ -64,6 +69,7 @@ export async function serve(request:Request,env:Env):Promise<Response> {
       await env.DB.exec(OPERATIONS_MIGRATION);
       await env.DB.exec(PUBLIC_DEMO_MIGRATION);
       await env.DB.exec(REAL_DEMO_MIGRATION);
+      await env.DB.exec(HOSPITAL_MIGRATION);
       await env.LIS_DB.exec(LIS_MIGRATION);
       return json({ready:true,syntheticOnly:true,warning:'Prototype bootstrapped. Not a clinical system.'});
     }

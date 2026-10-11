@@ -4,7 +4,7 @@ Two **separate** SQLite-backed D1 databases emulate independently operated syste
 
 | Database | Tables | Owner |
 |---|---|---|
-| `hospital_fabric` | 19 tables | Our integration platform |
+| `hospital_fabric` | 23 tables | Our integration platform |
 | `hospital_sim_lis` | `lis_orders`, `lis_results` | Simulated LIS; only for demos/tests |
 
 ## Core tables
@@ -43,3 +43,5 @@ Two **separate** SQLite-backed D1 databases emulate independently operated syste
 For `celld dev`, use the authenticated `/v1/admin/bootstrap` **local-only** endpoint after starting the Worker. Embedded migration strings are generated from the SQL files at build time.
 
 For production-style `celld` fleets, disable `ALLOW_DEV_BOOTSTRAP`, and apply migrations with `celld d1 migrations apply hospital_fabric ...` and `celld d1 migrations apply hospital_sim_lis ...` with an approved migration/rollback plan. Fleet mode needs a qualified object store and independent backups.
+
+`hospital_simulations` owns each visitor’s bounded scripted hospital state and command receipts through a single versioned row. It does not write to clinical product databases. See [hospital state and limits](HOSPITAL-SIMULATION.md).
