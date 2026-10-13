@@ -117,7 +117,7 @@ export async function importNumericChartResult(config:ChartConfig,openMrs:FhirCl
   const check=await reconcileChartObservation(config,report,obs,mapping.uuid);
   if(check!==saved.uuid)throw new FhirProtocolError('OpenMRS chart write not verified');
   const fhir=await openMrs.request('Observation/'+saved.uuid,'Observation');
-  if(fhir.resourceType!=='Observation'||fhir.subject?.reference!=='Patient/'+report.patientId)
+  if(fhir.resourceType!=='Observation'||(fhir.subject as {reference?:string}|undefined)?.reference!=='Patient/'+report.patientId)
     throw new FhirProtocolError('FHIR chart correlation check failed');
   await journal.complete(key,obs.resourceId,saved.uuid);
   return {state:'imported',id:saved.uuid};
