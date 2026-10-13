@@ -185,7 +185,7 @@ export async function reconcileLiveOrder(source: FhirClient, catalog: LabCatalog
   if (new Set(reports).size !== reports.length) throw new FhirProtocolError('Repeated result reference');
   const statuses: Record<string,RemoteOrder['state']>={requested:'awaiting_lab',accepted:'accepted','in-progress':'accepted',rejected:'rejected'};
   const state = statuses[String(task.status)] || (task.status==='completed'&&reports.length?'completed':'needs_review');
-  return {requestId:sr.id,taskId:task.id!,state,reportReferences:reports};
+  return {requestId:sr.id!,taskId:task.id!,state,reportReferences:reports};
 }
 export async function stageLiveOrder(config: LabConnection, input: LabRequest): Promise<RemoteOrder> {
   const test = validateLabRequest(config.catalog,input,true);
