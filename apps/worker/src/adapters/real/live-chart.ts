@@ -54,8 +54,9 @@ export function chartMarker(report:ReleasedReport,obs:ResultEntry):string {
 export function validateChartResult(report:ReleasedReport,obs:ResultEntry,config:ChartConfig) {
   if(!config.allowSyntheticChartWrites)throw new FhirProtocolError('Synthetic chart import permission missing');
   if(!report.orderNumber.startsWith('HF-SYNTH-'))throw new FhirProtocolError('Synthetic order number required');
-  if(!UUID.test(report.patientId)||!UUID.test(obs.resourceId)||!UUID.test(report.id))
-    throw new FhirProtocolError('Expected real FHIR UUID identities for chart import');
+  if(!UUID.test(report.patientId))throw new FhirProtocolError('Chart patient ID is not a FHIR UUID');
+  if(!UUID.test(obs.resourceId))throw new FhirProtocolError('Chart result observation ID is not a FHIR UUID');
+  if(!UUID.test(report.id))throw new FhirProtocolError('Chart report ID is not a FHIR UUID');
   if(!report.accessionNumber||report.status!=='final')
     throw new FhirProtocolError('Only final reports with verified accession may enter chart');
   if(!obs.effectiveDateTime||!Number.isFinite(Date.parse(obs.effectiveDateTime)))
