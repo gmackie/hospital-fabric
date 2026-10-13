@@ -29,7 +29,7 @@ jobs:
       - name: Validate the separate Type 3 Forge contract
         run: |
           .validation-tools/bin/forgec check forge-type3
-          .validation-tools/bin/forgec build forge-type3 --target cloudflare
+          .validation-tools/bin/forgec build forge-type3
       - name: Verify celld process restart independently
         run: node scripts/type3-smoke.mjs
         env:
