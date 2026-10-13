@@ -30,7 +30,7 @@ const practitioner={resourceType:'Practitioner',id:ownerId};
 function harness(){
   const sr=new Map(),tasks=new Map(),runs={posts:0,writeLost:false}, chartRows=[];
   const secondPatient={...patient,id:secondPatientId,identifier:[{system:input().patientIdentifierSystem,value:'HF-SYNTH-P2'}]};
-  let conflict=false, completed=false, badReport=false;
+  let conflict=false, completed=false, badReport=false, amended=false;
   function find(map,query){
     const number=decodeURIComponent(query.get('identifier')??'').split('|')[1];
     const matches=[...map.values()].filter(v=>v.identifier?.some(id=>id.value===number));
@@ -66,7 +66,7 @@ function harness(){
         output:completed?[{valueReference:{reference:'DiagnosticReport/'+reportId}}]:[]});
     }
     if(path.endsWith('/DiagnosticReport/'+reportId)){
-      return response({resourceType:'DiagnosticReport',id:reportId,meta:{versionId:'1'},status:'final',
+      return response({resourceType:'DiagnosticReport',id:reportId,meta:{versionId:amended?'2':'1'},status:amended?'amended':'final',
         subject:{reference:badReport?'Patient/other':'Patient/'+patientId},code:{coding:[{system:'http://loinc.org',code:'718-7'}]},
         basedOn:[{reference:'ServiceRequest/'+analysisId}],specimen:[{reference:'Specimen/'+specimenId}],
         result:[{reference:'Observation/'+observationId}]});
@@ -77,10 +77,10 @@ function harness(){
         basedOn:[{reference:'ServiceRequest/HF-SYNTH-O1'}],requisition:{value:'ACC-1'}});
     }
     if(path.endsWith('/Observation/'+observationId)){
-      return response({resourceType:'Observation',id:observationId,status:'final',meta:{versionId:'1'},
+      return response({resourceType:'Observation',id:observationId,status:amended?'amended':'final',meta:{versionId:amended?'2':'1'},
         subject:{reference:'Patient/'+patientId},specimen:{reference:'Specimen/'+specimenId},
         basedOn:[{reference:'ServiceRequest/'+analysisId}],code:{coding:[{system:'http://loinc.org',code:'718-7'}]},
-        valueQuantity:{value:13.2,system:'http://unitsofmeasure.org',code:'g/dL',unit:'g/dL'},
+        valueQuantity:{value:amended?13.4:13.2,system:'http://unitsofmeasure.org',code:'g/dL',unit:'g/dL'},
         effectiveDateTime:'2026-10-13T12:01:00Z'});
     }
     if(path.endsWith('/Specimen/'+specimenId))
@@ -101,7 +101,7 @@ function harness(){
   const results=new c.FhirClient({baseUrl:'http://127.0.0.1:18091/result',fetch:fetcher});
   const openMrs=new c.FhirClient({baseUrl:'http://127.0.0.1:18090/mrs',fetch:fetcher});
   return {config:{source,results,openMrs,catalog,conditionalCreateVerified:true,allowSandboxWrites:true},
-    fake:fetcher,runs,chartRows,sr,tasks,complete(){completed=true;},badReport(){badReport=true;}};
+    fake:fetcher,runs,chartRows,sr,tasks,complete(){completed=true;},amend(){amended=true;},badReport(){badReport=true;}};
 }
 function ledger(){
   const db=new TestDB();
@@ -145,6 +145,24 @@ test('OpenELIS product completion gates multi-resource numeric results with exac
   assert.equal(reports.length,1);assert.equal(reports[0].accessionNumber,'ACC-1');
   assert.equal(reports[0].observations[0].loinc,'718-7');assert.equal(reports[0].observations[0].value.value,13.2);
   h.badReport();await assert.rejects(()=>c.readCompletedLiveResults(h.config,input()),/validated matching/);
+});
+test('amended product reports retain versions and require chart review instead of a blind second write',async()=>{
+  const h=harness(),d=ledger();
+  try{
+    await c.stageLiveOrder(h.config,input());h.complete();
+    const original=(await c.readCompletedLiveResults(h.config,input()))[0];
+    await d.journal.claimOrder(input());
+    assert.equal(await d.journal.recordResult(input().orderNumber,original.id,original.version,original.status,'a'.repeat(64)),'new');
+    h.amend();
+    const amended=(await c.readCompletedLiveResults(h.config,input()))[0];
+    assert.equal(amended.status,'amended');assert.equal(amended.version,'2');assert.equal(amended.observations[0].value.value,13.4);
+    assert.equal(await d.journal.recordResult(input().orderNumber,amended.id,amended.version,amended.status,'b'.repeat(64)),'new');
+    assert.equal(d.db.raw.prepare('SELECT count(*) AS n FROM live_lab_report_versions').get().n,2);
+    const cfg={restBaseUrl:'http://127.0.0.1:18090/ws/rest/v1',authorization:'Basic test',fetch:h.fake,
+      allowSyntheticChartWrites:true,conceptMap:{'718-7':{uuid:conceptId,units:'g/dL',datatype:'Numeric'}}};
+    await assert.rejects(()=>c.importNumericChartResult(cfg,h.config.openMrs,d.journal,amended,amended.observations[0]),/Only final reports/);
+    assert.equal(h.chartRows.length,0);
+  }finally{d.db.close();}
 });
 test('result retrieval refuses incomplete laboratory Task or arbitrary report references',async()=>{
   const h=harness();await c.stageLiveOrder(h.config,input());
