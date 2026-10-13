@@ -1,0 +1,47 @@
+name: Live OpenMRS OpenELIS adapter contracts
+on:
+  pull_request:
+    paths:
+      - 'apps/worker/src/adapters/real/**'
+      - 'deploy/real/live-lab-migrations/**'
+      - 'deploy/real/hetzner-master/live-lab-host.mjs'
+      - 'tests/live-lab.test.mjs'
+      - 'scripts/build-live-connectors.mjs'
+      - '.github/workflows/live-lab.yml'
+  push:
+    branches: [main, 'feat/type3-*']
+    paths:
+      - 'apps/worker/src/adapters/real/**'
+      - 'deploy/real/live-lab-migrations/**'
+      - 'tests/live-lab.test.mjs'
+      - 'scripts/build-live-connectors.mjs'
+      - '.github/workflows/live-lab.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  adapter-contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.16.0'
+          cache: npm
+      - run: npm ci
+      - run: npx tsc --noEmit
+      - run: node --experimental-sqlite --test tests/live-lab.test.mjs
+      - run: node scripts/build-live-connectors.mjs
+      - name: Validate private ledger schema independently
+        run: |
+          python3 - <<'PY'
+          import sqlite3, pathlib
+          db=sqlite3.connect(':memory:')
+          db.executescript(pathlib.Path('deploy/real/live-lab-migrations/0001_live.sql').read_text())
+          assert db.execute('PRAGMA integrity_check').fetchone()[0]=='ok'
+          assert {r[0] for r in db.execute("SELECT name FROM sqlite_master WHERE type='table'")} >= {
+             'live_lab_orders','live_lab_report_versions','live_chart_writes'}
+          PY
+      - name: Safety note
+        run: echo "Fake-FHIR contract tests only; no live-host, hardware, PHI or clinical acceptance performed."
