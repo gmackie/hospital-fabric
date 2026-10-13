@@ -52,13 +52,17 @@ export function chartMarker(report:ReleasedReport,obs:ResultEntry):string {
   return 'HF synthetic order '+report.orderNumber+'; OpenELIS Observation/'+obs.resourceId+' version '+obs.version;
 }
 export function validateChartResult(report:ReleasedReport,obs:ResultEntry,config:ChartConfig) {
-  if(!config.allowSyntheticChartWrites||!report.orderNumber.startsWith('HF-SYNTH-') ||
-     !UUID.test(report.patientId)||!UUID.test(obs.resourceId) ||
-     !UUID.test(report.id)||!report.accessionNumber||report.status!=='final'||
-     !obs.effectiveDateTime||!Number.isFinite(Date.parse(obs.effectiveDateTime))||
-     obs.value.kind!=='quantity'||!Number.isFinite(obs.value.value) ||
+  if(!config.allowSyntheticChartWrites)throw new FhirProtocolError('Synthetic chart import permission missing');
+  if(!report.orderNumber.startsWith('HF-SYNTH-'))throw new FhirProtocolError('Synthetic order number required');
+  if(!UUID.test(report.patientId)||!UUID.test(obs.resourceId)||!UUID.test(report.id))
+    throw new FhirProtocolError('Expected real FHIR UUID identities for chart import');
+  if(!report.accessionNumber||report.status!=='final')
+    throw new FhirProtocolError('Only final reports with verified accession may enter chart');
+  if(!obs.effectiveDateTime||!Number.isFinite(Date.parse(obs.effectiveDateTime)))
+    throw new FhirProtocolError('Valid observation collection time required');
+  if(obs.value.kind!=='quantity'||!Number.isFinite(obs.value.value)||
      obs.value.system!=='http://unitsofmeasure.org')
-     throw new FhirProtocolError('Numeric, final, synthetic result and approved chart writer required');
+    throw new FhirProtocolError('Numeric UCUM-encoded result required for this chart writer');
   const mapping=config.conceptMap[obs.loinc];
   if(!mapping||!UUID.test(mapping.uuid)||mapping.datatype!=='Numeric'||
      mapping.units.toLowerCase()!==obs.value.code.toLowerCase())
