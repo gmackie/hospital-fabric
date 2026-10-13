@@ -14,6 +14,12 @@ The public landing page now simulates registration, emergency/outpatient assessm
 
 The public interactive synthetic walkthrough is hosted at [med.gmac.io](https://med.gmac.io) on Cloudflare Workers with two independent D1 databases. It demonstrates order delivery, a lost acknowledgment, reconciliation, and result import. The delivery walkthrough and real-product proof are at `/delivery-lab`; no token is needed for public simulations. The token-based local operator console is served only when `PUBLIC_DEMO` is not enabled and is not deployed publicly. See [cloud deployment and verification](docs/CLOUD-DEMO.md).
 
+## General live OpenMRS–OpenELIS connector (private research)
+
+The Type 3 work now includes a **generalized real-product laboratory adapter** alongside the existing fixed hemoglobin proof. It supports multiple independently correlated synthetic patients/orders, an installation-reviewed test catalog, actual source/result FHIR stores, versioned laboratory reports, private order/chart-write journals, and a private host CLI for the running OpenMRS/OpenELIS stack. This is not a replacement LIS and does not bypass product accession, QC, or release.
+
+See [general live laboratory guide](docs/LIVE-LAB.md). The only supported writes are explicitly enabled on isolated synthetic instances; general clinical use, novel test catalogs, production identity/security, and host-side multi-test conformance remain separate validation gates.
+
 ## Real-service synthetic integration
 
 Private OpenMRS/OpenELIS services now complete a fixed synthetic hemoglobin round-trip, including verified result return to OpenMRS. The public proof card reports that saved workflow; interactive public actions use the simulator. See [the host runbook](docs/HETZNER-MASTER.md) and [protocol boundaries](docs/REAL-SERVICES.md).
