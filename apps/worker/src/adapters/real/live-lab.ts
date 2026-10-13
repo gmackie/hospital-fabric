@@ -296,3 +296,22 @@ export async function readReleasedReports(results: FhirClient, catalog: LabCatal
   }
   return output;
 }
+
+/** Product task must be COMPLETED in the OpenELIS result store, not just created in source HAPI. */
+export async function readCompletedLiveResults(config: LabConnection, input: LabRequest): Promise<ReleasedReport[]> {
+  const source = await reconcileLiveOrder(config.source,config.catalog,input);
+  if (!source) throw new FhirProtocolError('Source laboratory order not present');
+  const task = await config.results.request('Task/' + source.taskId,'Task');
+  if (task.id !== source.taskId || task.status !== 'completed' ||
+      reference(task.for,'result task patient') !== 'Patient/' + input.patientId ||
+      reference(task.owner,'result task practitioner') !== 'Practitioner/' + input.ownerId) {
+    throw new FhirProtocolError('OpenELIS has not completed this exact patient/task');
+  }
+  const identifiers = entries(task.identifier,'result task identifiers');
+  if (!identifiers.some(x=>{const o=object(x,'task identifier');return o.system===ORDER_SYSTEM&&o.value===input.orderNumber;}))
+    throw new FhirProtocolError('OpenELIS Task external order identifier conflicts');
+  const outputs = entries(task.output,'completed task outputs');
+  if (!outputs.length) throw new FhirProtocolError('Completed laboratory Task contains no report');
+  const refs = outputs.map(x=>localRef(object(x,'task output').valueReference,'DiagnosticReport'));
+  return readReleasedReports(config.results,config.catalog,input,refs);
+}
