@@ -154,6 +154,15 @@ test('chart writer dynamically resolves installed LOINC mapping, inserts once an
     const cfg={restBaseUrl:'http://127.0.0.1:18090/ws/rest/v1',authorization:'Basic test',
       fetch:h.fake,allowSyntheticChartWrites:true,
       conceptMap:{'718-7':{uuid:conceptId,units:'g/dL',datatype:'Numeric'}}};
+    assert.ok(report.orderNumber.startsWith('HF-SYNTH-'), 'order number');
+    assert.ok(report.accessionNumber, 'accession');
+    assert.equal(report.status,'final');
+    assert.ok(obs.effectiveDateTime, 'effective time');
+    assert.equal(obs.value.kind,'quantity');
+    assert.equal(obs.value.system,'http://unitsofmeasure.org');
+    assert.equal(cfg.allowSyntheticChartWrites,true);
+    assert.equal(report.id.length,36);
+    assert.equal(obs.resourceId.length,36);
     assert.equal((await c.importNumericChartResult(cfg,h.config.openMrs,d.journal,report,obs)).state,'imported');
     assert.equal((await c.importNumericChartResult(cfg,h.config.openMrs,d.journal,report,obs)).state,'existing');
     assert.equal(h.chartRows.length,1);
