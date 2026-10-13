@@ -14,6 +14,7 @@ const output=await build({stdin:{contents:[
 ].join('\n'),resolveDir:process.cwd()},bundle:true,platform:'neutral',format:'esm',write:false});
 const c=await import('data:text/javascript;base64,'+Buffer.from(output.outputFiles[0].text).toString('base64'));
 const patientId='11111111-1111-4111-8111-111111111111',ownerId='22222222-2222-4222-8222-222222222222';
+const secondPatientId='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const conceptId='44444444-4444-4444-8444-444444444444',observationId='55555555-5555-4555-8555-555555555555';
 const analysisId='66666666-6666-4666-8666-666666666666',reportId='77777777-7777-4777-8777-777777777777',specimenId='88888888-8888-4888-8888-888888888888';
 const catalog={hb:{key:'hb',loinc:'718-7',specimen:'Whole Blood',enabled:true,openElisTestId:'12'},
@@ -28,6 +29,7 @@ const patient={resourceType:'Patient',id:patientId,name:[{family:'Synthetic'}],g
 const practitioner={resourceType:'Practitioner',id:ownerId};
 function harness(){
   const sr=new Map(),tasks=new Map(),runs={posts:0,writeLost:false}, chartRows=[];
+  const secondPatient={...patient,id:secondPatientId,identifier:[{system:input().patientIdentifierSystem,value:'HF-SYNTH-P2'}]};
   let conflict=false, completed=false, badReport=false;
   function find(map,query){
     const number=decodeURIComponent(query.get('identifier')??'').split('|')[1];
@@ -37,8 +39,10 @@ function harness(){
   async function fetcher(url,options){
     const target=new URL(url),path=target.pathname,method=options?.method||'GET';
     if(path.includes('/mrs/')&&path.endsWith('/Patient/'+patientId))return response(patient);
+    if(path.includes('/mrs/')&&path.endsWith('/Patient/'+secondPatientId))return response(secondPatient);
     if(path.includes('/mrs/')&&path.endsWith('/Observation/'+observationId))return response({resourceType:'Observation',id:observationId,subject:{reference:'Patient/'+patientId}});
     if(path.endsWith('/Patient/'+patientId))return response(patient);
+    if(path.endsWith('/Patient/'+secondPatientId))return response(secondPatient);
     if(path.endsWith('/Practitioner/'+ownerId))return response(practitioner);
     if(path.endsWith('/ServiceRequest')&&target.searchParams.has('identifier'))return find(sr,target.searchParams);
     if(path.endsWith('/Task')&&target.searchParams.has('identifier'))return find(tasks,target.searchParams);
@@ -114,10 +118,11 @@ test('the live adapter accepts arbitrary reviewed test codes and many independen
 });
 test('real FHIR source conditionally stages and reconciles multiple orders without resubmitting',async()=>{
   const h=harness();
-  for(const o of [input(),input('HF-SYNTH-O2','cr')])assert.equal((await c.stageLiveOrder(h.config,o)).state,'awaiting_lab');
-  assert.equal(h.runs.posts,2);
+  const second={...input('HF-SYNTH-O3','hb'),patientId:secondPatientId,patientIdentifier:'HF-SYNTH-P2'};
+  for(const o of [input(),input('HF-SYNTH-O2','cr'),second])assert.equal((await c.stageLiveOrder(h.config,o)).state,'awaiting_lab');
+  assert.equal(h.runs.posts,3);
   assert.equal((await c.stageLiveOrder(h.config,input())).taskId,'task-HF-SYNTH-O1');
-  assert.equal(h.runs.posts,2);
+  assert.equal(h.runs.posts,3);
 });
 test('writer refuses unverified transaction capability, bad identity and bad catalog',async()=>{
   const h=harness();await assert.rejects(()=>c.stageLiveOrder({...h.config,conditionalCreateVerified:false},input()));assert.equal(h.runs.posts,0);
