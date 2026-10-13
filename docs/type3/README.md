@@ -26,12 +26,12 @@ node scripts/type3-check.mjs
 node scripts/type3-build.mjs
 npx tsc -p apps/type3-worker/tsconfig.json
 node scripts/type3-secrets.mjs
-npx wrangler dev --config apps/type3-worker/wrangler.jsonc --local
+npx wrangler dev --config apps/type3-worker/wrangler.jsonc --local --ip 127.0.0.1 --port 8788
 # Or, in a separate run (not the same DB):
 celld dev apps/type3-worker --host 127.0.0.1 --port 8788
 ```
 
-Open `http://127.0.0.1:8788`, enter the generated local token, initialize the separate research database, and create a study. The token is not stored in browser storage. Pending synthetic commands retain their original IDs in session storage across reloads.
+Open `http://127.0.0.1:8788`, enter the generated local token, initialize the separate research database, and create a study. The token is not stored in browser storage. Pending synthetic commands retain their original IDs in session storage across reloads. Bind address/port are CLI options because celld 0.6.2 rejects Wrangler's `dev` configuration block.
 
 The worker requires `ENABLE_TYPE3_RESEARCH=1`, rejects non-loopback request URLs, and rejects every request when `PUBLIC_DEMO=1`. The default D1 ID is a **local placeholder**, not a provisioned cloud database. There is no deploy command or cloud migration in this contribution.
 
