@@ -18,7 +18,7 @@ export type ChartConfig={
   conceptMap:Readonly<Record<string, {uuid:string;units:string;datatype:'Numeric'}>>;
   allowSyntheticChartWrites:boolean;
 };
-const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const safe=(s:string)=>encodeURIComponent(s);
 const object=(v:unknown):Record<string,unknown>=>{
   if(!v||typeof v!=='object'||Array.isArray(v))throw new FhirProtocolError('Invalid OpenMRS response');
