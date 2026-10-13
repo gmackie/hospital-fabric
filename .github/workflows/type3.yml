@@ -25,9 +25,21 @@ jobs:
       - run: node scripts/type3-smoke.mjs
         env:
           TYPE3_EVIDENCE_PATH: type3-workerd-evidence.json
+      - run: python3 scripts/install-validation-tools.py
+      - name: Validate the separate Type 3 Forge contract
+        run: |
+          .validation-tools/bin/forgec check forge-type3
+          .validation-tools/bin/forgec build forge-type3 --target cloudflare
+      - name: Verify celld process restart independently
+        run: node scripts/type3-smoke.mjs
+        env:
+          CELLD_BIN: ${{ github.workspace }}/.validation-tools/bin/celld
+          TYPE3_EVIDENCE_PATH: type3-celld-evidence.json
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: type3-runtime-evidence
-          path: type3-workerd-evidence.json
+          path: |
+            type3-workerd-evidence.json
+            type3-celld-evidence.json
           if-no-files-found: warn
