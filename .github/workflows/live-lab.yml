@@ -30,7 +30,7 @@ jobs:
           node-version: '22.16.0'
           cache: npm
       - run: npm ci
-      - run: npx tsc --noEmit
+      - run: npm run typecheck
       - run: node --experimental-sqlite --test tests/live-lab.test.mjs
       - run: node scripts/build-live-connectors.mjs
       - name: Validate private ledger schema independently
