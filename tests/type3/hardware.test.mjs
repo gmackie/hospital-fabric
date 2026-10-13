@@ -1,0 +1,10 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {evaluateProcurement,PURCHASE_CHECKS,parseTelemetry} from '../../.type3-test/hardware.js';
+import {canonical} from '../../.type3-test/protocol.js';
+const quote=()=>({currency:'USD',costs:{bid:10000,premium:1500,tax:690,freight:2000,accessories:5000,service:12000,consumables:4000,disposal:1000},checks:Object.fromEntries(PURCHASE_CHECKS.map(x=>[x,'verified']))});
+test('all-in cost includes accessories, service, freight, fees and disposal',()=>{const q=quote();const r=evaluateProcurement(q);assert.equal(r.landedCostCents,Object.values(q.costs).reduce((a,b)=>a+b,0));assert.equal(r.disposition,'eligible-for-supervised-bench-evaluation');assert.equal(r.clinicalUseAllowed,false);});
+test('unknown cost is not free and missing checks hold procurement',()=>{const q=quote();q.costs.service=null;q.checks.licenseTransfer='unknown';const r=evaluateProcurement(q);assert.equal(r.landedCostCents,null);assert.deepEqual(r.unknownCosts,['service']);assert.ok(r.blockers.includes('licenseTransfer'));assert.equal(r.disposition,'hold');});
+test('invalid currency, negative costs and fictitious verification fail',()=>{for(const q of [{...quote(),currency:'BTC'},{...quote(),costs:{...quote().costs,bid:-1}},{...quote(),checks:{...quote().checks,benchTest:'assumed'}}])assert.throws(()=>evaluateProcurement(q));});
+test('telemetry rejects real-data mode, unsafely large values and missing device identity',()=>{const v={deviceId:'SIM-DEVICE-GATEWAY-001',sequence:1,observedMinute:0,mode:'synthetic',metric:'heartbeat',value:1};assert.equal(parseTelemetry(v).sequence,1);for(const o of [{...v,mode:'real'},{...v,value:100000},{...v,deviceId:'MONITOR-REAL-123'}])assert.throws(()=>parseTelemetry(o));});
+test('canonical serializer is stable and rejects floating point/undefined',()=>{assert.equal(canonical({z:[2,'a'],a:1}),'{'+ '"a":1,"z":[2,"a"]}');assert.throws(()=>canonical({a:1.2}));assert.throws(()=>canonical({a:undefined}));});

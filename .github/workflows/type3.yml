@@ -1,0 +1,33 @@
+name: Type 3 research
+on:
+  pull_request:
+    paths: ['apps/type3-worker/**', 'tests/type3/**', 'scripts/type3-*', 'forge-type3/**', '.github/workflows/type3.yml', 'package-lock.json']
+  push:
+    branches: [main, 'feat/type3-*']
+    paths: ['apps/type3-worker/**', 'tests/type3/**', 'scripts/type3-*', 'forge-type3/**', '.github/workflows/type3.yml', 'package-lock.json']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  research:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.16.0'
+          cache: npm
+      - run: npm ci
+      - run: node scripts/type3-check.mjs
+      - run: node scripts/type3-build.mjs
+      - run: npx tsc -p apps/type3-worker/tsconfig.json
+      - run: node scripts/type3-smoke.mjs
+        env:
+          TYPE3_EVIDENCE_PATH: type3-workerd-evidence.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: type3-runtime-evidence
+          path: type3-workerd-evidence.json
+          if-no-files-found: warn

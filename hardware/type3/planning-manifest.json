@@ -1,0 +1,20 @@
+{
+  "schema":"hospital-fabric-hardware-plan/v1",
+  "status":"unprocured-unvalidated-planning-only",
+  "clinicalUseAllowed":false,
+  "equipment":[
+    {"category":"icu-ventilator","proposedQuantity":4,"spares":"clinical-engineering-review-required","interface":"exact-model-and-license-unverified"},
+    {"category":"icu-monitor","proposedQuantity":4,"spares":"clinical-engineering-review-required","interface":"read-only-bench-first"},
+    {"category":"incubator","proposedQuantity":1,"interface":"unverified"},
+    {"category":"operating-table-and-anesthesia-package","proposedQuantity":2,"interface":"no-device-control"},
+    {"category":"pacu-position","proposedQuantity":4,"interface":"planning-assumption"},
+    {"category":"hematology-system","proposedQuantity":1,"interface":"LIS-model-specific-validation"},
+    {"category":"blood-gas-electrolytes-system","proposedQuantity":1,"interface":"LIS-model-specific-validation"},
+    {"category":"renal-chemistry-system","proposedQuantity":1,"interface":"possibly-shared-with-other-analyzer-after-review"},
+    {"category":"microbiology-capability","proposedQuantity":1,"interface":"facility-personnel-biosafety-and-workflow-review"},
+    {"category":"sterile-processing-system","proposedQuantity":1,"interface":"throughput-and-redundancy-review-required"},
+    {"category":"local-compute-node","proposedQuantity":2,"interface":"independent-restore-not-assumed-HA"},
+    {"category":"read-only-protocol-gateway","proposedQuantity":1,"interface":"synthetic-HTTP-fixtures-first"}
+  ],
+  "excludedFromClaim":["owned-inventory","prices","clinical-acceptance","full-WHO-checklist","staffing","oxygen-design","electrical-design","pharmacy","blood-supply","radiation-authorization"]
+}

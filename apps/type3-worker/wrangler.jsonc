@@ -1,0 +1,8 @@
+{
+  "name": "hospital-fabric-type3-research",
+  "main": "dist/index.mjs",
+  "compatibility_date": "2026-10-01",
+  "dev": {"ip": "127.0.0.1", "port": 8788},
+  "vars": {"ENABLE_TYPE3_RESEARCH":"1", "ALLOW_TYPE3_BOOTSTRAP":"1"},
+  "d1_databases": [{"binding":"RESEARCH_DB","database_name":"hospital_type3_research","database_id":"00000000-0000-0000-0000-000000000003","migrations_dir":"migrations"}]
+}

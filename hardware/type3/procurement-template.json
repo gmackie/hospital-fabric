@@ -1,0 +1,5 @@
+{
+  "currency": "USD",
+  "costs": {"bid":null,"premium":null,"tax":null,"freight":null,"accessories":null,"service":null,"consumables":null,"disposal":null},
+  "checks": {"identity":"unknown","decontamination":"unknown","accessories":"unknown","interfaceDocumentation":"unknown","licenseTransfer":"unknown","consumables":"unknown","serviceSupport":"unknown","recallReview":"unknown","dataSanitization":"unknown","benchTest":"unknown"}
+}
