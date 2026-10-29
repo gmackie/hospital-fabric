@@ -18,6 +18,8 @@
     "build:console": "node scripts/build-console.mjs",
     "test:console": "npm run build && playwright test",
     "dev:demo": "npm run build && wrangler dev --config apps/worker/wrangler.demo.jsonc --local",
+    "build:demo": "npm run build && node scripts/prepare-demo-deploy.mjs",
+    "check:demo": "npm run build:demo && wrangler deploy --config apps/worker/dist/wrangler.json --no-bundle --keep-vars --dry-run --outdir .validation-tools/demo-dry-run",
     "deploy:demo": "npm run build && wrangler d1 migrations apply DB --config apps/worker/wrangler.demo.jsonc --remote && wrangler d1 migrations apply LIS_DB --config apps/worker/wrangler.demo.jsonc --remote && wrangler deploy --config apps/worker/wrangler.demo.jsonc",
     "test:real-contracts": "node --test tests/real-adapters.test.mjs",
     "probe:real": "node scripts/probe-real-services.mjs",
