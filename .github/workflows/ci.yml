@@ -1,7 +1,10 @@
 name: Scaffold conformance
 on:
   push:
+    # Feature branches validate through pull_request; main validates after merge.
+    branches: [main]
   pull_request:
+  workflow_dispatch:
 jobs:
   test:
     runs-on: ubuntu-latest
