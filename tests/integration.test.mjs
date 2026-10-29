@@ -195,7 +195,7 @@ test('lost ACK + simulated Worker restart -> remote lookup, no duplicate',async(
   } finally {env.DB.close();env.LIS_DB.close();}
 });
 
-test('a result arriving before lost-ACK recovery remains importable after restart',async()=>{
+test('an early imported result stays completed after lost-ACK recovery and restart',async()=>{
   const {env,call}=await initialize();
   try {
     const patient=await call('POST','/v1/demo/patients',{label:'SYNTHETIC-EARLY-RESULT'});
