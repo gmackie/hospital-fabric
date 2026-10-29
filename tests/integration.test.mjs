@@ -195,6 +195,66 @@ test('lost ACK + simulated Worker restart -> remote lookup, no duplicate',async(
   } finally {env.DB.close();env.LIS_DB.close();}
 });
 
+test('an early imported result stays completed after lost-ACK recovery and restart',async()=>{
+  const {env,call}=await initialize();
+  try {
+    const patient=await call('POST','/v1/demo/patients',{label:'SYNTHETIC-EARLY-RESULT'});
+    const input={patientId:patient.body.id,testCode:'CBC',requestId:'early-result-recovery-001'};
+    const order=await call('POST','/v1/demo/lab-orders',input);
+    assert.equal(order.status,201,JSON.stringify(order));
+    const id=order.body.operationId;
+    await call('POST','/v1/demo/faults/drop-next-ack');
+    const delivery=await call('POST','/v1/admin/tick');
+    assert.equal(delivery.body.dispatched[0].state,'outcome_unknown');
+    // Keep reconciliation out of the next tick, without relying on wall-clock timing.
+    await env.DB.prepare('UPDATE outbox SET available_at=9007199254740991 WHERE operation_id=?').bind(id).run();
+    const remote=await env.LIS_DB.prepare('SELECT id,idempotency_key FROM lis_orders').first();
+    // The independent synthetic LIS can release a report while its ACK is missing.
+    const reportId=`demo-report:${remote.id}`;
+    await env.LIS_DB.prepare(`INSERT INTO lis_results
+      (id,lis_order_id,report_id,result_text,unit_code,released_at) VALUES(?,?,?,?,?,0)`)
+      .bind(`demo-result:${remote.id}`,remote.id,reportId,'SYNTHETIC: 7.5','10^9/L').run();
+    const early=await call('POST','/v1/admin/tick');
+    assert.equal(early.status,200,JSON.stringify(early));
+    assert.deepEqual(early.body.dispatched,[]);
+    assert.deepEqual(early.body.results,{processed:1,skipped:0,quarantined:0});
+    assert.equal((await call('GET',`/v1/operations/${id}`)).body.operation.state,'outcome_unknown');
+    assert.equal((await env.DB.prepare('SELECT state FROM demo_lab_orders WHERE operation_id=?').bind(id).first()).state,'completed');
+    assert.equal((await env.DB.prepare('SELECT count(*) AS n FROM inbox').first()).n,1);
+    assert.equal((await call('GET',`/v1/demo/patients/${patient.body.id}/results`)).body.results.length,1);
+
+    const restarted=(await import('../apps/worker/dist/index.mjs?early-result-recovery')).default;
+    const recovered=await call('POST',`/v1/operations/${id}/reconcile`,undefined,true,restarted);
+    assert.equal(recovered.status,200,JSON.stringify(recovered));
+    assert.equal(recovered.body.attempts[0].state,'accepted');
+    const recoveredOperation=(await call('GET',`/v1/operations/${id}`)).body.operation;
+    assert.equal(recoveredOperation.target_resource,`LisOrder/${remote.id}`);
+    assert.equal(recoveredOperation.idempotency_key,remote.idempotency_key);
+    assert.equal(recoveredOperation.state,'completed','Delivery recovery must preserve the already imported result');
+    const replay=await call('POST','/v1/demo/lab-orders',input,true,restarted);
+    assert.equal(replay.status,200,JSON.stringify(replay));
+    assert.equal(replay.body.operationId,id);
+    const repeated=await call('POST','/v1/admin/tick',undefined,true,restarted);
+    assert.deepEqual(repeated.body.results,{processed:0,skipped:1,quarantined:0});
+    const chart=(await call('GET',`/v1/demo/patients/${patient.body.id}/results`)).body.results;
+    assert.equal(chart.length,1);
+    assert.equal(chart[0].source_report_id,reportId);
+    assert.equal(chart[0].test_code,'CBC');
+    assert.equal(chart[0].result_text,'SYNTHETIC: 7.5');
+    assert.equal(chart[0].unit_code,'10^9/L');
+    assert.equal(chart[0].simulated,1);
+    assert.equal((await call('GET',`/v1/operations/${id}`)).body.operation.state,'completed');
+    assert.equal((await env.DB.prepare('SELECT state FROM demo_lab_orders WHERE operation_id=?').bind(id).first()).state,'completed');
+    assert.equal((await env.DB.prepare('SELECT state FROM outbox WHERE operation_id=?').bind(id).first()).state,'delivered');
+    assert.equal((await env.DB.prepare('SELECT count(*) AS n FROM inbox').first()).n,1);
+    assert.equal((await env.LIS_DB.prepare('SELECT count(*) AS n FROM lis_orders').first()).n,1);
+    assert.equal((await env.LIS_DB.prepare('SELECT count(*) AS n FROM lis_results').first()).n,1);
+    const events=(await call('GET',`/v1/operations/${id}/events`)).body.events;
+    assert.equal(events.filter(e=>e.event_type==='result.imported').length,1);
+    assert.equal(events.filter(e=>e.event_type==='order.accepted').length,1);
+  } finally {env.DB.close();env.LIS_DB.close();}
+});
+
 test('selected reconciliation never dispatches unrelated pending work and records recovery history',async()=>{
   const {env,call}=await initialize();
   try {

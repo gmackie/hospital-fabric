@@ -50,9 +50,13 @@ async function accepted(env: Env, item: Pending, remoteId: string) {
   const at = Date.now();
   const gate = `EXISTS(SELECT 1 FROM outbox WHERE id=? AND lease_token=? AND state='processing')`;
   await env.DB.batch([
-    env.DB.prepare(`UPDATE integration_operations SET state='accepted',target_resource=?,last_error=NULL,updated_at=? WHERE id=? AND ${gate}`)
+    // A result may arrive while the delivery ACK is missing. Confirm delivery
+    // without regressing that atomically imported result's completion.
+    env.DB.prepare(`UPDATE integration_operations SET state=CASE WHEN EXISTS(
+      SELECT 1 FROM demo_lab_orders d WHERE d.operation_id=integration_operations.id AND d.state='completed'
+      ) THEN 'completed' ELSE 'accepted' END,target_resource=?,last_error=NULL,updated_at=? WHERE id=? AND ${gate}`)
       .bind(`LisOrder/${remoteId}`,at,item.operation_id,item.id,item.lease_token),
-    env.DB.prepare(`UPDATE demo_lab_orders SET state='accepted',updated_at=? WHERE operation_id=? AND ${gate}`)
+    env.DB.prepare(`UPDATE demo_lab_orders SET state='accepted',updated_at=? WHERE operation_id=? AND state<>'completed' AND ${gate}`)
       .bind(at,item.operation_id,item.id,item.lease_token),
     env.DB.prepare(`INSERT OR IGNORE INTO operation_events(id,operation_id,event_type,details_json,occurred_at)
       SELECT ?,?,?,?,? WHERE ${gate}`)
