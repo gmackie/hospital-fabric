@@ -7,3 +7,7 @@ export class RemoteOutcomeUnknown extends Error {
 export class ReconciliationRequired extends Error {
   readonly _tag = 'ReconciliationRequired' as const;
 }
+/** The registry cannot supply a destination adapter; nothing was sent. */
+export class AdapterUnavailable extends Error {
+  readonly _tag = 'AdapterUnavailable' as const;
+}

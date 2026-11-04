@@ -1,0 +1,17 @@
+// Cloud tier (hospital.gmac.io): the same dist/index.mjs as the site, on Cloudflare Workers.
+{
+  "name": "hospital-fabric-cloud",
+  "account_id": "c07a7e704db1808e1fff91bed2b1cd49",
+  "main": "dist/index.mjs",
+  "compatibility_date": "2026-10-01",
+  "workers_dev": false,
+  "routes": [{ "pattern": "hospital.gmac.io", "custom_domain": true }],
+  "vars": { "HF_PROFILE": "cloud", "ALLOW_DEV_BOOTSTRAP": "0" },
+  "d1_databases": [
+    { "binding": "DB", "database_name": "hospital-fabric-cloud-core", "database_id": "64d630cc-4385-4519-88ca-d4ed488eeeda", "migrations_dir": "migrations/core" },
+    { "binding": "LIS_DB", "database_name": "hospital-fabric-cloud-lis", "database_id": "89fd3be4-d85a-4e48-a676-faf269100677", "migrations_dir": "migrations/sim_lis" }
+  ],
+  "ratelimits": [{ "name": "DEMO_RATE_LIMITER", "namespace_id": "1002", "simple": { "limit": 60, "period": 60 } }],
+  "triggers": { "crons": ["* * * * *"] },
+  "observability": { "enabled": true }
+}

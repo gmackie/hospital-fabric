@@ -1,0 +1,15 @@
+// Site fleet (hospital.mackie.house): the same dist/index.mjs as the cloud, deployed with
+// `celld deploy`. celld does not support routes; ingress is Caddy on the node. D1 lives in
+// the on-site fleet bucket and celld binds it by database_name; the ids are placeholders.
+// Synthetic data only until Phase 1 replaces the shared operator token.
+{
+  "name": "hospital-fabric-site",
+  "main": "dist/index.mjs",
+  "compatibility_date": "2026-10-01",
+  "vars": { "HF_PROFILE": "site", "ALLOW_DEV_BOOTSTRAP": "1" },
+  "d1_databases": [
+    { "binding": "DB", "database_name": "hospital_fabric", "database_id": "00000000-0000-0000-0000-000000000001", "migrations_dir": "migrations/core" },
+    { "binding": "LIS_DB", "database_name": "hospital_sim_lis", "database_id": "00000000-0000-0000-0000-000000000002", "migrations_dir": "migrations/sim_lis" }
+  ],
+  "triggers": { "crons": ["* * * * *"] }
+}

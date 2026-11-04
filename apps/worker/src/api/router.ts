@@ -5,6 +5,7 @@ import { publicDemo } from '../demo/api';
 import { demoPage } from '../demo/page';
 import { Effect } from 'effect';
 import type { Env } from '../db/types';
+import { deploymentProfile, type DeploymentProfile } from '../profile';
 import { ApiError } from '../domain/errors';
 import { decodeOrder, decodePatient, decodeRelease } from '../domain/contracts';
 import { createLabOrder,createPatient,getOperation,getOperationEvents,getOrders } from '../db/operations';
@@ -43,23 +44,26 @@ export async function serve(request:Request,env:Env):Promise<Response> {
   const url = new URL(request.url);
   const path = url.pathname;
   const method = request.method;
+  let profile: DeploymentProfile;
+  try { profile = deploymentProfile(env); }
+  catch(error) { if (error instanceof ApiError) return json({code:error.code,message:error.message},error.status); throw error; }
   const asset = path==='/' ? [CONSOLE_HTML,'text/html; charset=utf-8'] :
     path==='/console.js' ? [CONSOLE_JS,'text/javascript; charset=utf-8'] :
     path==='/console.css' ? [CONSOLE_CSS,'text/css; charset=utf-8'] : null;
-  const hospitalAsset = path==='/hospital'||path==='/hospital/'||(path==='/'&&env.PUBLIC_DEMO==='1') ? [HOSPITAL_HTML,'text/html; charset=utf-8'] : path==='/hospital.js' ? [HOSPITAL_JS,'text/javascript; charset=utf-8'] : path==='/hospital.css' ? [HOSPITAL_CSS,'text/css; charset=utf-8'] : null;
+  const hospitalAsset = path==='/hospital'||path==='/hospital/'||(path==='/'&&profile.publicDemo) ? [HOSPITAL_HTML,'text/html; charset=utf-8'] : path==='/hospital.js' ? [HOSPITAL_JS,'text/javascript; charset=utf-8'] : path==='/hospital.css' ? [HOSPITAL_CSS,'text/css; charset=utf-8'] : null;
   if(method==='GET' && hospitalAsset) return new Response(hospitalAsset[0], {headers:{'content-type':hospitalAsset[1]!, 'cache-control':'no-store', 'x-content-type-options':'nosniff', 'referrer-policy':'no-referrer', 'content-security-policy':"default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'"}});
-  if (env.PUBLIC_DEMO==='1' && (path==='/console.js' || path==='/console.css')) return json({code:'not_found'},404);
-  if (env.PUBLIC_DEMO!=='1' && method==='GET' && asset) return new Response(asset[0], {headers:{
+  if (!profile.operatorConsole && (path==='/console.js' || path==='/console.css')) return json({code:'not_found'},404);
+  if (profile.operatorConsole && method==='GET' && asset) return new Response(asset[0], {headers:{
     'content-type':asset[1]!, 'cache-control':'no-store', 'x-content-type-options':'nosniff',
     'referrer-policy':'no-referrer',
     'content-security-policy':"default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'",
   }});
-  if (method==='GET' && path==='/healthz') return json({ok:true,service:'hospital-fabric',mode:'synthetic-only'});
+  if (method==='GET' && path==='/healthz') return json({ok:true,service:'hospital-fabric',mode:'synthetic-only',profile:profile.name});
   if (method==='OPTIONS') return new Response(null,{status:204,headers:noStore});
   try {
-    if (method==='GET' && path==='/delivery-lab') return env.PUBLIC_DEMO==='1' ? demoPage() : Response.redirect(new URL('/',url).href,302);
-    if (env.PUBLIC_DEMO==='1' && ((method==='GET' && path==='/demo/api/real') || path==='/internal/demo/real-evidence')) return await realDemo(request,env);
-    if (env.PUBLIC_DEMO==='1' && path.startsWith('/demo/api/')) return await publicDemo(request,env);
+    if (method==='GET' && path==='/delivery-lab') return profile.publicDemo ? demoPage() : Response.redirect(new URL('/',url).href,302);
+    if (profile.publicDemo && ((method==='GET' && path==='/demo/api/real') || path==='/internal/demo/real-evidence')) return await realDemo(request,env);
+    if (profile.publicDemo && path.startsWith('/demo/api/')) return await publicDemo(request,env);
     if(path.startsWith('/hospital/api/')) return await hospitalApi(request,env);
     requireAuth(request,env);
     if (method==='POST' && path==='/v1/admin/bootstrap') {
