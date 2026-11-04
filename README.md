@@ -26,6 +26,19 @@ One bundle (`apps/worker/dist/index.mjs`) runs in three roles, selected by the `
 
 `PUBLIC_DEMO=1` without `HF_PROFILE` still means `cloud`, for the med.gmac.io deployment. An unknown profile, or `PUBLIC_DEMO=1` with a non-cloud profile, returns 503. The dispatcher resolves each delivery's adapter from its `component_instances` row; a missing, disabled or unsupported component blocks the order for review before anything is sent.
 
+### Site-to-cloud link (HF-13 Phase R)
+
+Every minute the `site` cron drains its referral outbox to `SITE_LINK_URL`, then posts a heartbeat (site id, deployed commit, unfinished deliveries, referral queue depth). Each request carries `x-hf-link-timestamp`, `x-hf-link-nonce` and `x-hf-link-signature` = hex HMAC-SHA256(`SITE_LINK_SECRET`, `timestamp.nonce.body`). The `cloud` rejects bad signatures, timestamps more than 5 minutes off, and reused nonces.
+
+| Endpoint | Profile | Access |
+| --- | --- | --- |
+| `POST /v1/site-link/referrals` `{requestId?, reason?}` | site, local | `x-demo-token`; enqueues one synthetic referral |
+| `GET /v1/site-link/referrals`, `POST /v1/site-link/sync` | site, local | `x-demo-token`; inspect the outbox or run the cron step now |
+| `POST /site-link/v1/heartbeat`, `POST /site-link/v1/referrals` | cloud, local | signed site requests only |
+| `GET /site-link/v1/status`, `GET /site-link` | cloud, local | public; online while the last heartbeat is under 3 minutes old |
+
+Referral delivery uses the dispatcher's lease and fencing discipline (`jobs/site-link.ts`). The cloud stores each idempotency key once, so a delivery whose acknowledgement was lost is retried harmlessly; while the WAN is down the queue grows and drains on reconnect. Every endpoint returns 404 unless `SITE_LINK_SECRET` (at least 32 bytes) is configured. On labnuc `install.sh` generates it into `/etc/hospital-fabric/site-secrets.env` and `deploy.sh` merges it, plus `HF_COMMIT`, into the celld vars; on the cloud it is a Worker secret (`wrangler secret put SITE_LINK_SECRET --config apps/worker/wrangler.cloud.jsonc`).
+
 ## General live OpenMRS–OpenELIS connector (private research)
 
 The Type 3 work now includes a **generalized real-product laboratory adapter** alongside the existing fixed hemoglobin proof. It supports multiple independently correlated synthetic patients/orders, an installation-reviewed test catalog, actual source/result FHIR stores, versioned laboratory reports, private order/chart-write journals, and a private host CLI for the running OpenMRS/OpenELIS stack. This is not a replacement LIS and does not bypass product accession, QC, or release.

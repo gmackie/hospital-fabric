@@ -1,4 +1,5 @@
 // Cloud tier (hospital.gmac.io): the same dist/index.mjs as the site, on Cloudflare Workers.
+// Receives the site link when the SITE_LINK_SECRET Worker secret is set (wrangler secret put).
 {
   "name": "hospital-fabric-cloud",
   "account_id": "c07a7e704db1808e1fff91bed2b1cd49",

@@ -9,6 +9,8 @@ if [ ! -f "$secrets" ]; then
   # celld has no secret store: this value is deployed as a var into the on-site bucket.
   (umask 077; printf 'DEMO_API_KEY=%s\n' "$(openssl rand -hex 24)" > "$secrets")
 fi
+# Shared HMAC key for the site-to-cloud link; the cloud Worker holds the same value as a secret.
+grep -q '^SITE_LINK_SECRET=' "$secrets" || printf 'SITE_LINK_SECRET=%s\n' "$(openssl rand -hex 32)" >> "$secrets"
 chmod 0600 /etc/hospital-fabric/celld.env "$secrets"
 install -m 0644 "$here/hospital-fabric-celld.service" /etc/systemd/system/hospital-fabric-celld.service
 install -m 0644 "$here/hospital-fabric.caddy" /etc/caddy/conf.d/hospital-fabric.conf

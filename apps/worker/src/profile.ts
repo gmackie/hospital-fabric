@@ -19,12 +19,16 @@ export interface DeploymentProfile {
   readonly researchProfiles: boolean;
   /** Adapters for real on-site products may be resolved from the registry. */
   readonly realAdapters: boolean;
+  /** Sends signed heartbeats and queued referrals to SITE_LINK_URL. */
+  readonly siteLinkSend: boolean;
+  /** Accepts signed site traffic and serves the public link status. */
+  readonly siteLinkReceive: boolean;
 }
 
 const PROFILES: Readonly<Record<DeploymentProfileName, DeploymentProfile>> = {
-  local: { name:'local', publicDemo:false, operatorConsole:true, researchProfiles:true, realAdapters:false },
-  site: { name:'site', publicDemo:false, operatorConsole:true, researchProfiles:false, realAdapters:true },
-  cloud: { name:'cloud', publicDemo:true, operatorConsole:false, researchProfiles:false, realAdapters:false },
+  local: { name:'local', publicDemo:false, operatorConsole:true, researchProfiles:true, realAdapters:false, siteLinkSend:true, siteLinkReceive:true },
+  site: { name:'site', publicDemo:false, operatorConsole:true, researchProfiles:false, realAdapters:true, siteLinkSend:true, siteLinkReceive:false },
+  cloud: { name:'cloud', publicDemo:true, operatorConsole:false, researchProfiles:false, realAdapters:false, siteLinkSend:false, siteLinkReceive:true },
 };
 
 export function deploymentProfile(env: Env): DeploymentProfile {
