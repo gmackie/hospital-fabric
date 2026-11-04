@@ -1,12 +1,17 @@
 name: Scaffold conformance
 on:
   push:
+    # Feature branches validate through pull_request; main validates after merge.
+    branches: [main]
   pull_request:
+  workflow_dispatch:
 jobs:
   test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: actions/setup-node@v4
         with:
           node-version: '22.16.0'
@@ -19,6 +24,8 @@ jobs:
         run: npm ci --no-audit --no-fund
       - name: Typecheck, bundle and synthetic fault tests
         run: npm run check
+      - name: Validate code-only Cloudflare release artifact
+        run: npm run check:demo
       - name: Smoke test local Wrangler/workerd and D1
         run: npm run smoke:workerd
       - name: Install console test browser
@@ -31,3 +38,28 @@ jobs:
         run: npm run check:forge
       - name: Smoke test celld crash and persistent recovery
         run: npm run smoke:celld
+  forgegraph-report:
+    needs: test
+    if: ${{ always() && github.server_url == 'https://git.forgegraf.com' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Report tested revision and actual conformance outcome
+        env:
+          FORGEGRAPH_TOKEN: ${{ secrets.FORGEGRAPH_TOKEN }}
+          REPOSITORY: ${{ github.repository }}
+          SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          SOURCE_BRANCH: ${{ github.head_ref || github.ref_name }}
+          TEST_RESULT: ${{ needs.test.result }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_number }}
+        run: |
+          test -n "$FORGEGRAPH_TOKEN"
+          jq -n --arg repository "$REPOSITORY" --arg sha "$SOURCE_SHA" \
+            --arg branch "$SOURCE_BRANCH" --arg status "$TEST_RESULT" \
+            --arg runId "$RUN_ID" --arg runUrl "$RUN_URL" \
+            '{owner: ($repository | split("/")[0]), repo: ($repository | split("/")[1]),
+              sha: $sha, branch: $branch, status: $status, runId: $runId,
+              runUrl: $runUrl, workflowName: "Scaffold conformance"}' > report.json
+          curl --fail-with-body --retry 2 https://forgegraf.com/api/fg/ci/report \
+            -H "Authorization: Bearer $FORGEGRAPH_TOKEN" \
+            -H 'Content-Type: application/json' --data-binary @report.json

@@ -1,2 +1,18 @@
-# Registry identity only; existing Wrangler and private host deployment remain authoritative.
+# Adopt the existing public Worker; private host deployment remains separate.
 app: hospital-fabric
+stages:
+  - name: production
+    url: https://med.gmac.io
+    targets:
+      - name: worker
+        platform: cloudflare-workers
+        config:
+          workerName: hospital-fabric-demo
+          appDir: "."
+          buildCommand: npm run build:demo
+          deployCommand: npx wrangler deploy --config apps/worker/dist/wrangler.json --no-bundle --keep-vars
+          syncSecrets: "false"
+health:
+  url: https://med.gmac.io/healthz
+  interval: 60
+  timeout: 10
