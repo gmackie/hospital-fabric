@@ -11,6 +11,9 @@ if [ ! -f "$secrets" ]; then
 fi
 chmod 0600 /etc/hospital-fabric/celld.env "$secrets"
 install -m 0644 "$here/hospital-fabric-celld.service" /etc/systemd/system/hospital-fabric-celld.service
+install -m 0644 "$here/hospital-fabric.caddy" /etc/caddy/conf.d/hospital-fabric.conf
+caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile >/dev/null || { rm -f /etc/caddy/conf.d/hospital-fabric.conf; exit 1; }
+systemctl reload caddy
 systemctl daemon-reload
 systemctl enable --now hospital-fabric-celld.service
 systemctl is-active hospital-fabric-celld.service

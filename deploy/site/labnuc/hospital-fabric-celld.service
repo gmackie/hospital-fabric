@@ -18,7 +18,7 @@ Environment=CELLD_ADDR=127.0.0.1:18780
 # Peer and unauthenticated operator listener: Tailscale only, never the LAN.
 Environment=CELLD_INTERNAL_ADDR=100.64.115.45:18781
 Environment=CELLD_ADVERTISE=100.64.115.45:18781
-# Caddy replaces both forwarded headers, and nothing else reaches the loopback listener.
+# hospital-fabric.caddy overwrites both forwarded headers; nothing else reaches the loopback listener.
 Environment=CELLD_TRUST_FORWARDED_HEADERS=1
 Environment=CELLD_WATCH=/var/lib/hospital-fabric/celld
 Environment=CELLD_ASSET_CACHE_DIR=/var/cache/hospital-fabric/celld
