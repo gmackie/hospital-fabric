@@ -50,6 +50,8 @@ Nothing binds the LAN address 10.1.1.188 or a wildcard address. `check-compose.p
 
 Memory budget: the caps total 9.9 GiB (OpenMRS 3.75 GiB, OpenELIS 6.19 GiB). JVM heaps are smaller than on hetzner-master: OpenMRS 1792m, OpenELIS 1408m, and 896m for each HAPI store. labnuc has 27 GB, with about 15 GB available before this stack. The celld node keeps its own 2 GB cap.
 
+Measured on 2026-11-04 with everything running: the stack used 4.2 GB, against caps of 9.9 GiB. The largest consumers were the OpenMRS backend at 1.3 GB and the OpenELIS webapp at 1.1 GB, plus 0.7 GB for each HAPI store. labnuc memory available fell from 15.9 GB to 11.5 GB. Images, containers and data take 13 GB, and the upstream checkouts 0.35 GB. The first OpenMRS boot imports the reference catalog and took about 97 minutes on labnuc. Until it finishes, REST returns a redirect to `/openmrs/initialsetup`. Don't restart the backend during this import.
+
 Probe and conformance, as root on labnuc:
 
 ```sh
