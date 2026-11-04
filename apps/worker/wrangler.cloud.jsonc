@@ -3,6 +3,7 @@
   "name": "hospital-fabric-cloud",
   "account_id": "c07a7e704db1808e1fff91bed2b1cd49",
   "main": "dist/index.mjs",
+  "no_bundle": true,
   "compatibility_date": "2026-10-01",
   "workers_dev": false,
   "routes": [{ "pattern": "hospital.gmac.io", "custom_domain": true }],

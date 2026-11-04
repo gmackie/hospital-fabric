@@ -5,6 +5,7 @@
 {
   "name": "hospital-fabric-site",
   "main": "dist/index.mjs",
+  "no_bundle": true,
   "compatibility_date": "2026-10-01",
   "vars": { "HF_PROFILE": "site", "ALLOW_DEV_BOOTSTRAP": "1" },
   "d1_databases": [

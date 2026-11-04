@@ -1,0 +1,46 @@
+[Unit]
+Description=Hospital Fabric site node (celld)
+Documentation=https://celld.dev/docs/
+Wants=network-online.target tailscaled.service
+After=network-online.target tailscaled.service
+# The Tailscale address may appear after boot; keep retrying instead of giving up.
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+DynamicUser=yes
+StateDirectory=hospital-fabric/celld
+CacheDirectory=hospital-fabric/celld
+# Bucket credentials, endpoint and CELLD_BUCKET (root 0600).
+EnvironmentFile=/etc/hospital-fabric/celld.env
+# Worker listener: loopback only; Caddy terminates TLS in front of it.
+Environment=CELLD_ADDR=127.0.0.1:18780
+# Peer and unauthenticated operator listener: Tailscale only, never the LAN.
+Environment=CELLD_INTERNAL_ADDR=100.64.115.45:18781
+Environment=CELLD_ADVERTISE=100.64.115.45:18781
+# Caddy replaces both forwarded headers, and nothing else reaches the loopback listener.
+Environment=CELLD_TRUST_FORWARDED_HEADERS=1
+Environment=CELLD_WATCH=/var/lib/hospital-fabric/celld
+Environment=CELLD_ASSET_CACHE_DIR=/var/cache/hospital-fabric/celld
+# labnuc is shared with the product stack; shed load before the cgroup limit.
+Environment=CELLD_MAX_RSS_MB=1536
+MemoryMax=2G
+ExecStart=/opt/hospital-fabric/bin/celld
+Restart=always
+RestartSec=2
+# Must exceed CELLD_SHUTDOWN_TOTAL_MS (default 40 s).
+TimeoutStopSec=45
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=yes
+LockPersonality=yes
+
+[Install]
+WantedBy=multi-user.target

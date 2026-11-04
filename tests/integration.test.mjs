@@ -510,9 +510,10 @@ test('site and cloud profiles deploy the same bundle with the same bindings (HF-
   const {readFileSync}=await import('node:fs');
   const load=(name)=>JSON.parse(readFileSync(new URL(`../apps/worker/${name}`,import.meta.url),'utf8').replace(/^\s*\/\/.*$/gm,''));
   const site=load('wrangler.site.jsonc'), cloud=load('wrangler.cloud.jsonc');
+  assert.equal(site.no_bundle,true,'both deployers must ship dist/index.mjs unchanged');
   assert.equal(site.vars.HF_PROFILE,'site');
   assert.equal(cloud.vars.HF_PROFILE,'cloud');
-  for (const key of ['main','compatibility_date']) assert.equal(site[key],cloud[key],key);
+  for (const key of ['main','no_bundle','compatibility_date']) assert.equal(site[key],cloud[key],key);
   assert.deepEqual(site.triggers,cloud.triggers);
   const bindings=(c)=>c.d1_databases.map(d=>[d.binding,d.migrations_dir]);
   assert.deepEqual(bindings(site),bindings(cloud));
