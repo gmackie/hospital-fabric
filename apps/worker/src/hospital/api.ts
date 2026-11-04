@@ -1,5 +1,6 @@
 import type { Env } from '../db/types';
 import { ApiError } from '../domain/errors';
+import { deploymentProfile } from '../profile';
 import { seedHospital, applyCommand, viewHospital, resolveProfile, profileOf, SimulationError, DEFAULT_PROFILE, PROFILE_CAPS, type Hospital, type Command, type Profile } from './model';
 import { stateDigest, DIGEST_ALGORITHM } from './canonical';
 type Row={token:string;version:number;state_json:string};
@@ -19,7 +20,7 @@ function sessionProfile(text:string,env:Env):Profile|undefined {
   const raw=(body as {profile?:unknown}).profile;
   if(raw===undefined)return undefined;
   // Research sizing is a local instrument; the public shift stays bounded by its fixed defaults.
-  if(env.PUBLIC_DEMO==='1')throw new ApiError(403,'profile_not_allowed','Research profiles are only available on a local worker.');
+  if(!deploymentProfile(env).researchProfiles)throw new ApiError(403,'profile_not_allowed','Research profiles are only available on a local worker.');
   try{return resolveProfile(raw);}catch(e){if(e instanceof SimulationError)throw new ApiError(e.status,e.code,e.message);throw e;}
 }
 export async function hospitalApi(request:Request,env:Env) {
@@ -27,7 +28,7 @@ export async function hospitalApi(request:Request,env:Env) {
   if(!['GET','POST'].includes(request.method))throw new ApiError(405,'method_not_allowed','Use GET or POST');
   if(request.method==='POST'&&request.headers.get('origin')!==url.origin)throw new ApiError(403,'origin_required','Use the simulation on this site');
   if(env.DEMO_RATE_LIMITER&&!(await env.DEMO_RATE_LIMITER.limit({key:request.headers.get('cf-connecting-ip')??'local'})).success)throw new ApiError(429,'rate_limited','Wait a minute before continuing.');
-  if(url.pathname==='/hospital/api/protocol'&&request.method==='GET')return json({schema:'hospital-fabric-protocol/v1',model:'hospital-fabric-shift',modelVersion:1,actionSemantics:'hospital-fabric-commands/v1',actions:ACTIONS,digest:DIGEST_ALGORITHM,exportSchema:'hospital-fabric-shift-export/v1',researchProfiles:env.PUBLIC_DEMO!=='1',defaultProfile:DEFAULT_PROFILE,profileCaps:PROFILE_CAPS,syntheticOnly:true});
+  if(url.pathname==='/hospital/api/protocol'&&request.method==='GET')return json({schema:'hospital-fabric-protocol/v1',model:'hospital-fabric-shift',modelVersion:1,actionSemantics:'hospital-fabric-commands/v1',actions:ACTIONS,digest:DIGEST_ALGORITHM,exportSchema:'hospital-fabric-shift-export/v1',researchProfiles:deploymentProfile(env).researchProfiles,defaultProfile:DEFAULT_PROFILE,profileCaps:PROFILE_CAPS,syntheticOnly:true});
   const token=request.headers.get('cookie')?.match(/(?:^|;\s*)hospital_sim=([a-f0-9]{64})(?:;|$)/)?.[1];
   let row=token?await env.DB.prepare('SELECT token,version,state_json FROM hospital_simulations WHERE token=? AND expires_at>?').bind(token,Date.now()).first<Row>():null;
   if(url.pathname==='/hospital/api/session'&&request.method==='POST') {

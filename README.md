@@ -14,6 +14,18 @@ The public landing page now simulates registration, emergency/outpatient assessm
 
 The public interactive synthetic walkthrough is hosted at [med.gmac.io](https://med.gmac.io) on Cloudflare Workers with two independent D1 databases. It demonstrates order delivery, a lost acknowledgment, reconciliation, and result import. The delivery walkthrough and real-product proof are at `/delivery-lab`; no token is needed for public simulations. The token-based local operator console is served only when `PUBLIC_DEMO` is not enabled and is not deployed publicly. See [cloud deployment and verification](docs/CLOUD-DEMO.md).
 
+## Deployment profiles
+
+One bundle (`apps/worker/dist/index.mjs`) runs in three roles, selected by the `HF_PROFILE` var and never by hostname. See `apps/worker/src/profile.ts`.
+
+| Profile | Config | Runtime | Serves |
+| --- | --- | --- | --- |
+| `local` (default) | `wrangler.jsonc` | `wrangler dev` / `celld dev` | Operator console, research profiles |
+| `site` | `wrangler.site.jsonc` | `celld deploy` to the on-site fleet bucket | Operator console; real-product adapters may be enabled |
+| `cloud` | `wrangler.cloud.jsonc` | `wrangler deploy` to hospital.gmac.io | Public walkthrough; simulators only |
+
+`PUBLIC_DEMO=1` without `HF_PROFILE` still means `cloud`, for the med.gmac.io deployment. An unknown profile, or `PUBLIC_DEMO=1` with a non-cloud profile, returns 503. The dispatcher resolves each delivery's adapter from its `component_instances` row; a missing, disabled or unsupported component blocks the order for review before anything is sent.
+
 ## General live OpenMRS–OpenELIS connector (private research)
 
 The Type 3 work now includes a **generalized real-product laboratory adapter** alongside the existing fixed hemoglobin proof. It supports multiple independently correlated synthetic patients/orders, an installation-reviewed test catalog, actual source/result FHIR stores, versioned laboratory reports, private order/chart-write journals, and a private host CLI for the running OpenMRS/OpenELIS stack. This is not a replacement LIS and does not bypass product accession, QC, or release.

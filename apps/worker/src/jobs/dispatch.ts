@@ -1,15 +1,15 @@
 import { Effect } from 'effect';
 import type { Env } from '../db/types';
-import { simulatedLisAdapter } from '../adapters/lis-simulator';
-import { ReconciliationRequired } from '../domain/errors';
+import { labAdapterFor } from '../adapters/registry';
+import { AdapterUnavailable, ReconciliationRequired } from '../domain/errors';
 
 type Pending = {
   id: string; operation_id: string; state: string; attempts: number; idempotency_key: string;
-  payload_hash: string; patient_id: string; test_code: string; lease_token: string | null;
+  payload_hash: string; target_system: string; patient_id: string; test_code: string; lease_token: string | null;
 };
 
 const selectDue = `SELECT b.id,b.operation_id,b.state,b.attempts,b.lease_token,
-  o.idempotency_key,o.payload_hash,d.patient_id,d.test_code
+  o.idempotency_key,o.payload_hash,o.target_system,d.patient_id,d.test_code
   FROM outbox b
   JOIN integration_operations o ON o.id=b.operation_id
   JOIN demo_lab_orders d ON d.operation_id=o.id
@@ -115,8 +115,8 @@ export const dispatchOnce = (env: Env, operationId?: string) => Effect.gen(funct
   if (!item) return { ran: false, state: 'empty' };
   const attempt = yield* Effect.result(Effect.tryPromise({
     try: async () => {
+      const adapter = await labAdapterFor(env, item.target_system);
       // Reconcile before sending: prior attempts may have committed remotely.
-      const adapter = simulatedLisAdapter(env);
       await recordEvent(env, item, 'delivery.lookup_started', {attempt: item.attempts + 1});
       const existing = await adapter.lookupByKey(item.idempotency_key);
       await recordEvent(env, item, 'delivery.lookup_completed', {found: !!existing});
@@ -136,7 +136,7 @@ export const dispatchOnce = (env: Env, operationId?: string) => Effect.gen(funct
   }));
   if (attempt._tag === 'Success') return { ran:true, state:'accepted', operationId:item.operation_id };
   const error = attempt.failure;
-  if (error instanceof ReconciliationRequired) {
+  if (error instanceof ReconciliationRequired || error instanceof AdapterUnavailable) {
     yield* Effect.promise(() => blocked(env, item, error));
     return { ran:true, state:'needs_review', operationId:item.operation_id };
   }

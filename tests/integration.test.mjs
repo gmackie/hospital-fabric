@@ -456,3 +456,67 @@ test('unkeyed result intake advances past the first 25 released results (HF-8)',
     assert.equal((await call('POST','/v1/admin/tick')).body.results.processed,0);
   } finally {env.DB.close();env.LIS_DB.close();}
 });
+
+test('deployment profile comes from HF_PROFILE, not the request hostname (HF-13)',async()=>{
+  const {env}=await initialize();
+  const worker=(await import('../apps/worker/dist/index.mjs')).default;
+  const get=async(path)=>{const r=await worker.fetch(new Request('https://hospital.example'+path),env);return {status:r.status,text:await r.text()};};
+  try {
+    env.HF_PROFILE='cloud';
+    assert.equal(JSON.parse((await get('/healthz')).text).profile,'cloud');
+    assert.match((await get('/')).text,/\/hospital\.js/);
+    assert.equal((await get('/console.js')).status,404);
+    assert.deepEqual(JSON.parse((await get('/demo/api/state')).text),{started:false});
+    env.HF_PROFILE='site';
+    assert.equal(JSON.parse((await get('/healthz')).text).profile,'site');
+    assert.match((await get('/')).text,/\/console\.js/);
+    assert.equal((await get('/console.js')).status,200);
+    assert.equal(JSON.parse((await get('/demo/api/state')).text).code,'unauthorized');
+    assert.equal(JSON.parse((await get('/hospital/api/protocol')).text).researchProfiles,false);
+    for (const bad of [{HF_PROFILE:'production'},{HF_PROFILE:'site',PUBLIC_DEMO:'1'}]) {
+      Object.assign(env,bad);
+      const r=await get('/healthz');
+      assert.equal(r.status,503);
+      assert.equal(JSON.parse(r.text).code,'misconfigured');
+      delete env.PUBLIC_DEMO;
+    }
+  } finally {env.DB.close();env.LIS_DB.close();}
+});
+
+test('dispatch resolves its adapter from the component registry and blocks before sending when unavailable (HF-13)',async()=>{
+  for (const [sql,reason] of [
+    ["UPDATE component_instances SET enabled=0 WHERE id='demo-openelis'",/disabled/],
+    ["UPDATE component_instances SET product='OpenELIS' WHERE id='demo-openelis'",/No worker adapter for OpenELIS/],
+  ]) {
+    const {env,call}=await initialize();
+    try {
+      env.HF_PROFILE='site';
+      const p=await call('POST','/v1/demo/patients',{label:'SYNTHETIC-REGISTRY'});
+      const order=await call('POST','/v1/demo/lab-orders',{patientId:p.body.id,testCode:'CBC',requestId:'registry-001'});
+      await env.DB.prepare(sql).run();
+      const tick=await call('POST','/v1/admin/tick');
+      assert.equal(tick.body.dispatched[0].state,'needs_review',JSON.stringify(tick.body));
+      const op=await call('GET',`/v1/operations/${order.body.operationId}`);
+      assert.match(op.body.operation.last_error,reason);
+      assert.equal((await env.DB.prepare('SELECT state FROM outbox').first()).state,'blocked');
+      assert.equal((await env.LIS_DB.prepare('SELECT count(*) AS n FROM lis_orders').first()).n,0);
+      const events=(await call('GET',`/v1/operations/${order.body.operationId}/events`)).body.events.map(e=>e.event_type);
+      assert.ok(!events.includes('delivery.submit_started'),events.join());
+    } finally {env.DB.close();env.LIS_DB.close();}
+  }
+});
+
+test('site and cloud profiles deploy the same bundle with the same bindings (HF-13)',async()=>{
+  const {readFileSync}=await import('node:fs');
+  const load=(name)=>JSON.parse(readFileSync(new URL(`../apps/worker/${name}`,import.meta.url),'utf8').replace(/^\s*\/\/.*$/gm,''));
+  const site=load('wrangler.site.jsonc'), cloud=load('wrangler.cloud.jsonc');
+  assert.equal(site.vars.HF_PROFILE,'site');
+  assert.equal(cloud.vars.HF_PROFILE,'cloud');
+  for (const key of ['main','compatibility_date']) assert.equal(site[key],cloud[key],key);
+  assert.deepEqual(site.triggers,cloud.triggers);
+  const bindings=(c)=>c.d1_databases.map(d=>[d.binding,d.migrations_dir]);
+  assert.deepEqual(bindings(site),bindings(cloud));
+  assert.equal(site.routes,undefined,'celld does not support routes');
+  assert.equal(site.vars.PUBLIC_DEMO,undefined);
+  assert.deepEqual(cloud.routes,[{pattern:'hospital.gmac.io',custom_domain:true}]);
+});
