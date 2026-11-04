@@ -1,0 +1,12 @@
+# Tailnet hop for the OpenELIS UI/API. tailscaled terminates the tailnet HTTPS on
+# 100.64.115.45:18443 and forwards here; Caddy re-verifies the product's host-issued TLS.
+# Installed as /etc/caddy/conf.d/hospital-fabric-products.conf. Loopback only.
+http://:18444 {
+	bind 127.0.0.1
+	reverse_proxy https://127.0.0.1:18443 {
+		transport http {
+			tls_trust_pool file /etc/caddy/hospital-fabric-products-ca.crt
+			tls_server_name localhost
+		}
+	}
+}

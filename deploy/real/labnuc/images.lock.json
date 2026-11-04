@@ -1,0 +1,66 @@
+{
+  "resolvedAt": "2026-10-10T22:47:31.420719+00:00",
+  "platform": "linux/amd64",
+  "images": {
+    "OMRS_GATEWAY_IMAGE": {
+      "sourceTag": "openmrs/openmrs-reference-application-3-gateway:3.7.1",
+      "image": "docker.io/openmrs/openmrs-reference-application-3-gateway@sha256:e7478273a26131bf618984c666c9266ab6fc5f9de807b9d18228f143388932da",
+      "compressedBytes": 25988461,
+      "tagUpdatedAt": "2026-07-13T10:56:47.000855Z"
+    },
+    "OMRS_FRONTEND_IMAGE": {
+      "sourceTag": "openmrs/openmrs-reference-application-3-frontend:3.7.1",
+      "image": "docker.io/openmrs/openmrs-reference-application-3-frontend@sha256:6758ea81eea381617887339db034cec60ba2569d2e1513d337f36923c45393db",
+      "compressedBytes": 113501416,
+      "tagUpdatedAt": "2026-07-13T10:56:28.401881Z"
+    },
+    "OMRS_BACKEND_IMAGE": {
+      "sourceTag": "openmrs/openmrs-reference-application-3-backend:3.7.1",
+      "image": "docker.io/openmrs/openmrs-reference-application-3-backend@sha256:e580f813bcaef272867ba5cb2cf1677078841b0d3333a6121eb707d4489ab062",
+      "compressedBytes": 697077857,
+      "tagUpdatedAt": "2026-07-13T10:51:53.346266Z"
+    },
+    "OMRS_DATABASE_IMAGE": {
+      "sourceTag": "library/mariadb:10.11.7",
+      "image": "docker.io/library/mariadb@sha256:905dd2ee9f25eca4f8e916dfa9e008c817972bf3f9dde64bd0430952adeb8cb9",
+      "compressedBytes": 122463761,
+      "tagUpdatedAt": "2024-05-06T18:35:41.229335Z"
+    },
+    "OE_CERTGEN_IMAGE": {
+      "sourceTag": "itechuw/certgen:main",
+      "image": "docker.io/itechuw/certgen@sha256:9575a467f19d61e7326872e47944efee9bdea1a37a78ab99d7e57dd089d5059c",
+      "compressedBytes": 381234568,
+      "tagUpdatedAt": "2026-10-01T09:35:49.748196Z"
+    },
+    "OE_DATABASE_IMAGE": {
+      "sourceTag": "itechuw/openelis-global-2-database:3.2.3.0",
+      "image": "docker.io/itechuw/openelis-global-2-database@sha256:d1beff18ed6b361abbe97d559d8b838ef10861b3d84e04f02be2980968e52a68",
+      "compressedBytes": 153447008,
+      "tagUpdatedAt": "2026-09-26T06:12:43.533856Z"
+    },
+    "OE_APP_IMAGE": {
+      "sourceTag": "itechuw/openelis-global-2:3.2.3.0",
+      "image": "docker.io/itechuw/openelis-global-2@sha256:7fcf01a03e0c3ca71fb00ca222e5aad8b0f770a07dffe4f45ba20e002f5e2473",
+      "compressedBytes": 572351504,
+      "tagUpdatedAt": "2026-09-26T06:13:16.97982Z"
+    },
+    "OE_FHIR_IMAGE": {
+      "sourceTag": "itechuw/openelis-global-2-fhir:3.2.3.0",
+      "image": "docker.io/itechuw/openelis-global-2-fhir@sha256:abcf894f018b0b232d850cdcccd71fe210020b4ea6d57404a6396c0356b804e2",
+      "compressedBytes": 400655577,
+      "tagUpdatedAt": "2026-09-26T06:13:02.583673Z"
+    },
+    "OE_FRONTEND_IMAGE": {
+      "sourceTag": "itechuw/openelis-global-2-frontend:3.2.3.0",
+      "image": "docker.io/itechuw/openelis-global-2-frontend@sha256:7af508d4f6de9b65d7b63970a30e48e7676bbe322146ca91745a91a8047841cd",
+      "compressedBytes": 48010052,
+      "tagUpdatedAt": "2026-09-26T06:12:32.730454Z"
+    },
+    "OE_PROXY_IMAGE": {
+      "sourceTag": "itechuw/openelis-global-2-proxy:3.2.3.0",
+      "image": "docker.io/itechuw/openelis-global-2-proxy@sha256:01eca0aea80e4c5ff82136f6b6cd4669574c7d75ecb72e05849667d45bf552c0",
+      "compressedBytes": 14839942,
+      "tagUpdatedAt": "2026-09-26T06:12:31.077474Z"
+    }
+  }
+}

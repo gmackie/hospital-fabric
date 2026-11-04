@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """Rotate the packaged initial admin password via the product API, then verify login."""
-import http.cookiejar,json,pathlib,re,ssl,urllib.parse,urllib.request,urllib.error
-base=pathlib.Path('/mnt/master-apps/hospital-fabric')
-values=dict(line.split('=',1) for line in (base/'private/deployment.env').read_text().splitlines())
+import http.cookiejar,json,os,pathlib,re,ssl,urllib.parse,urllib.request,urllib.error
+base=pathlib.Path(os.environ.get('HF_BASE','/mnt/master-apps/hospital-fabric'))
+private=pathlib.Path(os.environ.get('HF_PRIVATE',base/'private'))
+values=dict(line.split('=',1) for line in (private/'deployment.env').read_text().splitlines())
 jar=http.cookiejar.CookieJar()
-context=ssl.create_default_context(cafile=str(base/'private/ca.crt'))
+context=ssl.create_default_context(cafile=str(private/'ca.crt'))
 opener=urllib.request.build_opener(urllib.request.HTTPCookieProcessor(jar),urllib.request.HTTPSHandler(context=context))
 url='https://localhost:18443/api/OpenELIS-Global'
 def request(path,fields=None):
@@ -24,5 +25,5 @@ if not login(values['OE_ADMIN_PASSWORD']):
  request('/ChangePasswordLogin?apiCall=true',{'loginName':'admin','password':'adminADMIN!','newPassword':values['OE_ADMIN_PASSWORD'],'confirmPassword':values['OE_ADMIN_PASSWORD'],'_csrf':match[1]})
  if not login(values['OE_ADMIN_PASSWORD']): raise RuntimeError('Private admin credential not verified after rotation')
 # Only a sanitized marker is retained; cookies and passwords stay in memory.
-(base/'private/openelis-access.ready').write_text('Private admin login verified through OpenELIS session API.\n')
+(private/'openelis-access.ready').write_text('Private admin login verified through OpenELIS session API.\n')
 print('OpenELIS private admin login verified.')

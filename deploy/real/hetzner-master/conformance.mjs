@@ -1,7 +1,7 @@
 /** Private live create-only transaction check. Uses generated synthetic fixtures only. */
 import {writeFileSync} from 'node:fs';
 import {randomUUID} from 'node:crypto';
-const base='/mnt/master-apps/hospital-fabric';
+const base=process.env.HF_BASE??'/mnt/master-apps/hospital-fabric', privateDir=process.env.HF_PRIVATE??base+'/private', host=process.env.HF_HOST??'hetzner-master';
 const {FhirClient}=await import(base+'/release/probe-client.mjs');
 const client=new FhirClient({baseUrl:'http://127.0.0.1:18091/fhir'});
 const suffix=randomUUID(), id='hf-conformance-'+suffix;
@@ -11,7 +11,7 @@ const request={resourceType:'ServiceRequest',id,status:'active',intent:'order',s
 const task={resourceType:'Task',id,status:'requested',intent:'order',owner:{reference:'Practitioner/'+id},for:{reference:'Patient/'+id},basedOn:[{reference:'ServiceRequest/'+id}]};
 const transaction=resources=>({resourceType:'Bundle',type:'transaction',entry:resources.map(resource=>({resource,request:{method:'PUT',url:resource.resourceType+'/'+resource.id,ifNoneMatch:'*'}}))});
 const version=resource=>resource.meta?.versionId;
-const evidence={checkedAt:new Date().toISOString(),host:'hetzner-master',server:'OpenELIS HAPI 6.6.0',fixture:id,scope:'create-only transaction replay and atomic rollback; not laboratory acceptance',passed:false};
+const evidence={checkedAt:new Date().toISOString(),host,server:'OpenELIS HAPI 6.6.0',fixture:id,scope:'create-only transaction replay and atomic rollback; not laboratory acceptance',passed:false};
 try {
  await client.request('Patient/'+id,'Patient',{method:'PUT',body:patient});
  await client.request('Practitioner/'+id,'Practitioner',{method:'PUT',body:{resourceType:'Practitioner',id}});
@@ -36,5 +36,5 @@ try {
  evidence.passed=true;
  evidence.checks=['two initial HTTP 201 receipts','accepted Task remains accepted at same version','ServiceRequest version unchanged on replay','new ServiceRequest rolled back atomically when existing Task conflicts'];
 } catch(error){evidence.error=error.message;process.exitCode=1;}
-writeFileSync(base+'/private/conformance-evidence.json',JSON.stringify(evidence,null,2)+'\n',{mode:0o600});
+writeFileSync(privateDir+'/conformance-evidence.json',JSON.stringify(evidence,null,2)+'\n',{mode:0o600});
 console.log(JSON.stringify(evidence,null,2));
