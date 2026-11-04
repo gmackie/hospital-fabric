@@ -1,0 +1,1 @@
+{"compilerOptions":{"target":"ES2022","module":"NodeNext","moduleResolution":"NodeNext","strict":true,"noUncheckedIndexedAccess":true,"skipLibCheck":true,"lib":["ES2022","DOM"],"types":[],"rootDir":"src","outDir":"../../.type3-test"},"include":["src/**/*.ts"],"exclude":["src/index.ts"]}

@@ -1,16 +1,25 @@
 import type { Env } from '../db/types';
 
 type RemoteResult = {
-  id:string; report_id:string; result_text:string; unit_code:string; released_at:number;
+  rowid:number; id:string; report_id:string; result_text:string; unit_code:string; released_at:number;
   idempotency_key:string; patient_id:string; test_code:string;
 };
 
-/** Simulated LIS result intake. This is NOT a clinical result validation pipeline. */
+const SOURCE = 'demo-openelis';
+
+/**
+ * Simulated LIS result intake. This is NOT a clinical result validation pipeline.
+ * Unkeyed polls (cron, operator tick) resume after a persistent rowid cursor so newer
+ * results are never starved by older ones (HF-8); keyed polls read one order's results.
+ * The inbox still deduplicates, so a crash between import and cursor update only re-reads.
+ */
 export async function pollResults(env: Env, limit=25, idempotencyKey?: string) {
-  const remote = await env.LIS_DB.prepare(`SELECT r.*,o.idempotency_key,o.patient_id,o.test_code
+  const cursor = idempotencyKey ? null : await env.DB.prepare('SELECT last_rowid FROM result_intake_cursor WHERE source_system=?')
+    .bind(SOURCE).first<{last_rowid:number}>();
+  const remote = await env.LIS_DB.prepare(`SELECT r.rowid AS rowid,r.*,o.idempotency_key,o.patient_id,o.test_code
     FROM lis_results r JOIN lis_orders o ON o.id=r.lis_order_id
-    WHERE (? IS NULL OR o.idempotency_key=?)
-    ORDER BY r.released_at LIMIT ?`).bind(idempotencyKey??null,idempotencyKey??null,limit).all<RemoteResult>();
+    WHERE (? IS NULL OR o.idempotency_key=?) AND r.rowid>?
+    ORDER BY r.rowid LIMIT ?`).bind(idempotencyKey??null,idempotencyKey??null,cursor?.last_rowid??0,limit).all<RemoteResult>();
   let processed = 0, skipped = 0, quarantined = 0;
   for (const result of remote.results) {
     const existing = await env.DB.prepare('SELECT payload_hash FROM inbox WHERE source_system=? AND dedupe_key=?')
@@ -49,6 +58,13 @@ export async function pollResults(env: Env, limit=25, idempotencyKey?: string) {
         .bind(`event:result:${result.report_id}`,op.id,'result.imported',JSON.stringify({reportId:result.report_id,synthetic:true}),at),
     ]);
     processed++;
+  }
+  const last = remote.results.at(-1);
+  if (!idempotencyKey && last) {
+    // Unmatched (quarantined) results are counted once and not re-examined on every tick.
+    await env.DB.prepare(`INSERT INTO result_intake_cursor(source_system,last_rowid,updated_at) VALUES(?,?,?)
+      ON CONFLICT(source_system) DO UPDATE SET last_rowid=MAX(last_rowid,excluded.last_rowid),updated_at=excluded.updated_at`)
+      .bind(SOURCE,last.rowid,Date.now()).run();
   }
   return {processed,skipped,quarantined};
 }

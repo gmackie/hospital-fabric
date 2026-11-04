@@ -12,7 +12,7 @@ import { releaseSimulatedResult } from '../adapters/lis-simulator';
 import { runDispatchBatch, reconcileOperation } from '../jobs/dispatch';
 import { pollResults } from '../jobs/results';
 import { CONSOLE_HTML, CONSOLE_JS, CONSOLE_CSS } from '../generated/console';
-import { CORE_MIGRATION, OPERATIONS_MIGRATION, PUBLIC_DEMO_MIGRATION, REAL_DEMO_MIGRATION, HOSPITAL_MIGRATION, LIS_MIGRATION } from '../generated/migrations';
+import { CORE_MIGRATION, OPERATIONS_MIGRATION, PUBLIC_DEMO_MIGRATION, REAL_DEMO_MIGRATION, HOSPITAL_MIGRATION, RESULT_CURSOR_MIGRATION, LIS_MIGRATION } from '../generated/migrations';
 
 const json = (body: unknown,status=200) => Response.json(body,{status,headers:{'cache-control':'no-store'}});
 const noStore = { 'cache-control':'no-store' };
@@ -70,6 +70,7 @@ export async function serve(request:Request,env:Env):Promise<Response> {
       await env.DB.exec(PUBLIC_DEMO_MIGRATION);
       await env.DB.exec(REAL_DEMO_MIGRATION);
       await env.DB.exec(HOSPITAL_MIGRATION);
+      await env.DB.exec(RESULT_CURSOR_MIGRATION);
       await env.LIS_DB.exec(LIS_MIGRATION);
       return json({ready:true,syntheticOnly:true,warning:'Prototype bootstrapped. Not a clinical system.'});
     }

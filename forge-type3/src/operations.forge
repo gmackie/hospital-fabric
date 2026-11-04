@@ -1,0 +1,75 @@
+/// Proposed reusable operations metadata. No patient records or clinical decisions.
+/// Generated data must have its own ownership/migration review before live use.
+enum ResearchProfile {
+  Type2 = "emt2-research-v2"
+  Type3 = "emt3-research-v2"
+}
+enum CareAreaKind {
+  Ward = "ward"
+  IntensiveCare = "icu"
+  Theatre = "theatre"
+  Recovery = "pacu"
+  Laboratory = "laboratory"
+}
+export resource ResearchFacility
+  @timestamps @versioned @audited
+  @crud("/v2/config/facilities")
+{
+  id : id
+  code : text length 1..80 @immutable @unique
+  profile : ResearchProfile
+  clinicalUseAllowed : boolean = false
+  find by code
+  list by profile
+    order by createdAt desc
+}
+export resource CareArea
+  @timestamps @versioned @audited
+  @crud("/v2/config/care-areas")
+{
+  id : id
+  facility : ResearchFacility
+  kind : CareAreaKind
+  planningPositions : integer >= 0
+  list by facility
+    order by createdAt desc
+}
+export resource ServiceDependencyDeclaration
+  @timestamps @versioned @audited
+  @crud("/v2/config/dependencies")
+{
+  id : id
+  facility : ResearchFacility
+  code : text length 1..80
+  declaredCapacity : integer >= 0
+  validUntil : datetime
+  sourceEvidence : text? length <= 128
+  list by facility
+    order by createdAt desc
+}
+export resource EquipmentCandidate
+  @timestamps @versioned @audited
+  @crud("/v2/config/equipment-candidates")
+{
+  id : id
+  facility : ResearchFacility
+  manufacturer : text? length <= 120
+  model : text? length <= 120
+  interfaceVerified : boolean = false
+  benchEvidenceDigest : text? length <= 64
+  list by facility
+    order by createdAt desc
+}
+export resource ValidationRequirement
+  @timestamps @versioned @audited
+  @crud("/v2/config/validation-requirements")
+{
+  id : id
+  facility : ResearchFacility
+  code : text length 1..80
+  accountableRole : text length 1..120
+  sourceReference : text? length <= 500
+  externalApprovalRequired : boolean = true
+  list by facility
+    order by createdAt desc
+}
