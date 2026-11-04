@@ -7,6 +7,7 @@ const paths = [
   ["REAL_DEMO_MIGRATION", `${base}/migrations/core/0004_real_demo.sql`],
   ["HOSPITAL_MIGRATION", `${base}/migrations/core/0005_hospital_simulation.sql`],
   ["RESULT_CURSOR_MIGRATION", `${base}/migrations/core/0006_result_intake_cursor.sql`],
+  ["SITE_LINK_MIGRATION", `${base}/migrations/core/0007_site_link.sql`],
   ["LIS_MIGRATION", `${base}/migrations/sim_lis/0001_lis.sql`],
 ];
 // D1 exec splits on newlines, not SQL statement boundaries. Emit one complete

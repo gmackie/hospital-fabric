@@ -8,11 +8,13 @@ actual=$(sha256sum "$release/dist/index.mjs" | cut -d' ' -f1)
 set -a; . /etc/hospital-fabric/celld.env; . /etc/hospital-fabric/site-secrets.env; set +a
 work=$(mktemp -d); trap 'rm -rf "$work"' EXIT
 cp -r "$release/dist" "$release/migrations" "$work/"
-# Merge the operator token into vars; the committed config never holds it.
-python3 - "$release/wrangler.site.jsonc" "$work/wrangler.json" <<'PY'
+# Merge the operator token and site-link secret into vars; the committed config never holds them.
+python3 - "$release/wrangler.site.jsonc" "$work/wrangler.json" "$(basename "$release")" <<'PY'
 import json, os, re, sys
 config = json.loads(re.sub(r'(?m)^\s*//.*$', '', open(sys.argv[1]).read()))
 config['vars']['DEMO_API_KEY'] = os.environ['DEMO_API_KEY']
+if os.environ.get('SITE_LINK_SECRET'): config['vars']['SITE_LINK_SECRET'] = os.environ['SITE_LINK_SECRET']
+if re.fullmatch(r'[0-9a-f]{40}', sys.argv[3]): config['vars']['HF_COMMIT'] = sys.argv[3]
 with open(sys.argv[2], 'w', opener=lambda p, f: os.open(p, f, 0o600)) as out: json.dump(config, out)
 PY
 celld=/opt/hospital-fabric/bin/celld

@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
 import { test } from 'node:test';
+import { createHmac } from 'node:crypto';
 
 class D1SqliteMock {
   constructor() {
@@ -520,4 +521,162 @@ test('site and cloud profiles deploy the same bundle with the same bindings (HF-
   assert.equal(site.routes,undefined,'celld does not support routes');
   assert.equal(site.vars.PUBLIC_DEMO,undefined);
   assert.deepEqual(cloud.routes,[{pattern:'hospital.gmac.io',custom_domain:true}]);
+});
+
+// HF-13 Phase R: two Workers from the same bundle, a site and a cloud, each with its own D1.
+const LINK_SECRET='test-only-site-link-secret-0123456789abcdef';
+function signedLink(path,body,{secret=LINK_SECRET,ts=Math.floor(Date.now()/1000),nonce=crypto.randomUUID(),text=JSON.stringify(body)}={}) {
+  const signature=createHmac('sha256',secret).update(`${ts}.${nonce}.${text}`).digest('hex');
+  return new Request('https://cloud.test'+path,{method:'POST',body:text,headers:{
+    'content-type':'application/json','x-hf-link-timestamp':String(ts),'x-hf-link-nonce':nonce,'x-hf-link-signature':signature}});
+}
+async function linkPair() {
+  const worker=(await import('../apps/worker/dist/index.mjs')).default;
+  const site=await initialize(), cloud=await initialize();
+  Object.assign(site.env,{HF_PROFILE:'site',SITE_ID:'test-site',SITE_LINK_URL:'https://cloud.test',SITE_LINK_SECRET:LINK_SECRET});
+  Object.assign(cloud.env,{HF_PROFILE:'cloud',SITE_LINK_SECRET:LINK_SECRET});
+  const link={mode:'up',requests:[]};
+  const realFetch=globalThis.fetch;
+  globalThis.fetch=async(input,init)=>{
+    const request=new Request(input,init);
+    link.requests.push(new URL(request.url).pathname);
+    if (link.mode==='down') throw new TypeError('WAN unreachable');
+    const response=await worker.fetch(request,cloud.env);
+    // The cloud committed the request; the site never sees the acknowledgement.
+    if (link.mode==='drop-ack') { link.mode='up'; throw new TypeError('connection reset'); }
+    return response;
+  };
+  const cloudCall=async(method,path,request)=>{
+    const response=await worker.fetch(request??new Request('https://cloud.test'+path,{method}),cloud.env);
+    const type=response.headers.get('content-type')??'';
+    return {status:response.status,body:type.includes('json')?await response.json():await response.text()};
+  };
+  const close=()=>{globalThis.fetch=realFetch;for (const env of [site.env,cloud.env]) {env.DB.close();env.LIS_DB.close();}};
+  return {worker,site,cloud,link,cloudCall,close};
+}
+const heartbeat=(over={})=>({siteId:'test-site',sentAt:Date.now(),commit:null,unfinishedDeliveries:0,referralQueueDepth:0,...over});
+
+test('site link rejects bad signatures, stale timestamps and replayed nonces (HF-13)',async()=>{
+  const {cloud,cloudCall,close}=await linkPair();
+  try {
+    const ok=signedLink('/site-link/v1/heartbeat',heartbeat(),{nonce:'replay-nonce-0000000001'});
+    assert.equal((await cloudCall('POST','',ok.clone())).status,200);
+    const replay=await cloudCall('POST','',ok);
+    assert.deepEqual([replay.status,replay.body.code],[401,'replayed_nonce']);
+    const cases=[
+      [{secret:'a-different-secret-that-is-long-enough-000'},'bad_signature'],
+      [{ts:Math.floor(Date.now()/1000)-400},'stale_timestamp'],
+      [{ts:Math.floor(Date.now()/1000)+400},'stale_timestamp'],
+    ];
+    for (const [options,code] of cases) {
+      const r=await cloudCall('POST','',signedLink('/site-link/v1/heartbeat',heartbeat(),options));
+      assert.deepEqual([r.status,r.body.code],[401,code],JSON.stringify(options));
+    }
+    const tampered=signedLink('/site-link/v1/heartbeat',heartbeat());
+    const forged=new Request(tampered.url,{method:'POST',headers:tampered.headers,body:JSON.stringify(heartbeat({referralQueueDepth:999}))});
+    assert.equal((await cloudCall('POST','',forged)).body.code,'bad_signature');
+    const unsigned=await cloudCall('POST','',new Request('https://cloud.test/site-link/v1/heartbeat',{method:'POST',body:JSON.stringify(heartbeat())}));
+    assert.equal(unsigned.status,401);
+    // Only the one authentic heartbeat was stored; rejected requests never consumed a nonce.
+    assert.equal((await cloud.env.DB.prepare('SELECT count(*) AS n FROM site_link_nonces').first()).n,1);
+    assert.equal((await cloud.env.DB.prepare('SELECT referral_queue_depth AS d FROM site_link_heartbeats').first()).d,0);
+  } finally {close();}
+});
+
+test('site referral outbox delivers exactly once across a WAN cut and a lost ACK (HF-13)',async()=>{
+  const {site,cloud,link,cloudCall,close}=await linkPair();
+  const sync=async()=>(await site.call('POST','/v1/site-link/sync')).body;
+  const cloudCount=async()=>(await cloud.env.DB.prepare('SELECT count(*) AS n FROM site_link_inbound_referrals').first()).n;
+  try {
+    link.mode='down';
+    const first=await site.call('POST','/v1/site-link/referrals',{requestId:'wan-001'});
+    assert.equal(first.status,201,JSON.stringify(first));
+    assert.equal((await site.call('POST','/v1/site-link/referrals',{requestId:'wan-001'})).status,200);
+    for (const requestId of ['wan-002','wan-003']) await site.call('POST','/v1/site-link/referrals',{requestId});
+    const offline=await sync();
+    assert.equal(offline.heartbeat.ok,false);
+    assert.equal(offline.referralQueueDepth,3);
+    assert.equal(await cloudCount(),0);
+    // Reconnect, but lose the acknowledgement of the first delivery after the cloud stored it.
+    await site.env.DB.prepare('UPDATE site_link_referrals SET available_at=0').run();
+    link.mode='drop-ack';
+    const lost=await sync();
+    assert.equal(lost.delivered[0].state,'retry',JSON.stringify(lost));
+    assert.equal(await cloudCount(),1);
+    await site.env.DB.prepare('UPDATE site_link_referrals SET available_at=0').run();
+    const drained=await sync();
+    assert.deepEqual(drained.delivered.map(d=>d.state),['delivered','delivered','delivered'],JSON.stringify(drained));
+    assert.equal(drained.referralQueueDepth,0);
+    assert.equal(drained.heartbeat.ok,true);
+    assert.equal(await cloudCount(),3);
+    const keys=(await cloud.env.DB.prepare('SELECT idempotency_key FROM site_link_inbound_referrals ORDER BY idempotency_key').all()).results.map(r=>r.idempotency_key);
+    assert.deepEqual(keys,['test-site:referral:wan-001','test-site:referral:wan-002','test-site:referral:wan-003']);
+    const attempts=(await site.env.DB.prepare("SELECT attempts FROM site_link_referrals WHERE idempotency_key='test-site:referral:wan-001'").first()).attempts;
+    assert.equal(attempts,3);
+    // A crashed delivery's expired lease is reclaimed; a key reused for a different payload is refused.
+    await site.call('POST','/v1/site-link/referrals',{requestId:'crash-001'});
+    await site.env.DB.prepare("UPDATE site_link_referrals SET state='processing',lease_token='stale',lease_until=0 WHERE idempotency_key='test-site:referral:crash-001'").run();
+    assert.deepEqual((await sync()).delivered.map(d=>d.state),['delivered']);
+    assert.equal(await cloudCount(),4);
+    const conflict=await cloudCall('POST','',signedLink('/site-link/v1/referrals',{siteId:'test-site',idempotencyKey:'test-site:referral:wan-001',payload:{synthetic:true,reason:'other'}}));
+    assert.deepEqual([conflict.status,conflict.body.code],[409,'referral_conflict']);
+    assert.equal(await cloudCount(),4);
+    const status=(await cloudCall('GET','/site-link/v1/status')).body;
+    assert.equal(status.sites[0].referralsReceived,4);
+    assert.equal(status.sites[0].reportedReferralQueueDepth,0);
+  } finally {close();}
+});
+
+test('cloud link status goes online then offline and exposes no secrets (HF-13)',async()=>{
+  const {worker,site,cloud,link,cloudCall,close}=await linkPair();
+  try {
+    assert.deepEqual((await cloudCall('GET','/site-link/v1/status')).body.sites,[]);
+    await worker.scheduled(undefined,site.env);
+    assert.ok(link.requests.includes('/site-link/v1/heartbeat'));
+    let status=(await cloudCall('GET','/site-link/v1/status')).body;
+    assert.equal(status.sites[0].siteId,'test-site');
+    assert.equal(status.sites[0].online,true);
+    assert.match((await cloudCall('GET','/site-link')).body,/>online</);
+    await cloud.env.DB.prepare('UPDATE site_link_heartbeats SET received_at=?').bind(Date.now()-181_000).run();
+    status=(await cloudCall('GET','/site-link/v1/status')).body;
+    assert.equal(status.sites[0].online,false);
+    const page=(await cloudCall('GET','/site-link')).body;
+    assert.match(page,/>offline</);
+    for (const text of [JSON.stringify(status),page]) {
+      assert.ok(!text.includes(LINK_SECRET));
+      assert.ok(!text.includes(site.env.DEMO_API_KEY));
+    }
+  } finally {close();}
+});
+
+test('only the site sends and only the cloud receives; no secret means disabled (HF-13)',async()=>{
+  const {worker,site,cloud,link,cloudCall,close}=await linkPair();
+  try {
+    // The site does not receive.
+    const siteReceive=await worker.fetch(signedLink('/site-link/v1/heartbeat',heartbeat()),site.env);
+    assert.equal(siteReceive.status,404);
+    assert.equal((await worker.fetch(new Request('https://site.test/site-link/v1/status'),site.env)).status,404);
+    // The cloud does not send, even with an operator token and a URL configured.
+    Object.assign(cloud.env,{SITE_LINK_URL:'https://cloud.test'});
+    const cloudSend=await cloud.call('POST','/v1/site-link/referrals',{});
+    assert.deepEqual([cloudSend.status,cloudSend.body.code],[404,'site_link_disabled']);
+    link.requests.length=0;
+    await worker.scheduled(undefined,cloud.env);
+    assert.deepEqual(link.requests,[]);
+    // Without the secret both ends are disabled.
+    delete cloud.env.SITE_LINK_SECRET;
+    assert.equal((await cloudCall('GET','/site-link/v1/status')).status,404);
+    assert.equal((await cloudCall('POST','',signedLink('/site-link/v1/heartbeat',heartbeat()))).status,404);
+    delete site.env.SITE_LINK_SECRET;
+    assert.equal((await site.call('POST','/v1/site-link/referrals',{})).status,404);
+    await worker.scheduled(undefined,site.env);
+    assert.deepEqual(link.requests,[]);
+    // A short secret counts as unset.
+    site.env.SITE_LINK_SECRET='too-short';
+    assert.equal((await site.call('POST','/v1/site-link/referrals',{})).status,404);
+    // Local may do both, for tests.
+    Object.assign(site.env,{HF_PROFILE:'local',SITE_LINK_SECRET:LINK_SECRET});
+    assert.equal((await site.call('POST','/v1/site-link/referrals',{})).status,201);
+    assert.equal((await worker.fetch(new Request('https://local.test/site-link/v1/status'),site.env)).status,200);
+  } finally {close();}
 });

@@ -25,4 +25,9 @@ export interface Env {
   DEMO_API_KEY?: string;
   REAL_DEMO_BRIDGE_TOKEN?: string;
   ALLOW_DEV_BOOTSTRAP?: string;
+  /** HF-13 site link: shared HMAC secret (>=32 bytes), cloud base URL, this site's id, deployed commit. */
+  SITE_LINK_SECRET?: string;
+  SITE_LINK_URL?: string;
+  SITE_ID?: string;
+  HF_COMMIT?: string;
 }
