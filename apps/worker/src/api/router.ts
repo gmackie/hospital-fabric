@@ -45,6 +45,11 @@ export async function serve(request:Request,env:Env):Promise<Response> {
   const url = new URL(request.url);
   const path = url.pathname;
   const method = request.method;
+  // Retired public hostnames (med.gmac.io) move permanently to the canonical one.
+  const legacy = env.LEGACY_HOSTS?.split(',').map(h=>h.trim()).filter(Boolean) ?? [];
+  if (env.CANONICAL_ORIGIN && legacy.includes(url.hostname)) {
+    return new Response(null,{status:301,headers:{location:new URL(path+url.search,env.CANONICAL_ORIGIN).href,'cache-control':'public, max-age=3600'}});
+  }
   let profile: DeploymentProfile;
   try { profile = deploymentProfile(env); }
   catch(error) { if (error instanceof ApiError) return json({code:error.code,message:error.message},error.status); throw error; }
@@ -59,7 +64,7 @@ export async function serve(request:Request,env:Env):Promise<Response> {
     'referrer-policy':'no-referrer',
     'content-security-policy':"default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'",
   }});
-  if (method==='GET' && path==='/healthz') return json({ok:true,service:'hospital-fabric',mode:'synthetic-only',profile:profile.name});
+  if (method==='GET' && path==='/healthz') return json({ok:true,service:'hospital-fabric',mode:'synthetic-only',profile:profile.name,commit:env.FG_COMMIT_HASH??null,bundleSha256:env.FG_BUNDLE_SHA256??null});
   if (method==='OPTIONS') return new Response(null,{status:204,headers:noStore});
   try {
     if (method==='GET' && path==='/delivery-lab') return profile.publicDemo ? demoPage() : Response.redirect(new URL('/',url).href,302);

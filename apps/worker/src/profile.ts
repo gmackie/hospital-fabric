@@ -33,7 +33,7 @@ const PROFILES: Readonly<Record<DeploymentProfileName, DeploymentProfile>> = {
 
 export function deploymentProfile(env: Env): DeploymentProfile {
   const raw = env.HF_PROFILE;
-  // PUBLIC_DEMO=1 predates profiles; med.gmac.io still deploys with it.
+  // PUBLIC_DEMO=1 predates profiles; keep it meaning cloud for older configs.
   if (raw === undefined || raw === '') return env.PUBLIC_DEMO === '1' ? PROFILES.cloud : PROFILES.local;
   if (!Object.hasOwn(PROFILES, raw)) throw new ApiError(503,'misconfigured','HF_PROFILE must be local, site or cloud');
   const profile = PROFILES[raw as DeploymentProfileName];

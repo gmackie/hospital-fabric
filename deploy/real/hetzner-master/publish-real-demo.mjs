@@ -7,6 +7,6 @@ if(checked.status!==0)throw Error('Real workflow verification failed; public pro
 const record=JSON.parse(readFileSync(b+'/private/lab-order-source.json'));
 if(record.returnPhase!=='verified')throw Error('Verified chart return required');
 const token=readFileSync(b+'/private/real-demo-bridge.token','utf8').trim();
-const response=await fetch('https://med.gmac.io/internal/demo/real-evidence',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({verifiedAt:record.returnEvidence.verifiedAt,value:13.2}),redirect:'error',signal:AbortSignal.timeout(15000)});
+const response=await fetch('https://hospital.gmac.io/internal/demo/real-evidence',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({verifiedAt:record.returnEvidence.verifiedAt,value:13.2}),redirect:'error',signal:AbortSignal.timeout(15000)});
 if(!response.ok)throw Error('Public proof publication HTTP '+response.status);
 console.log('Fixed synthetic real-workflow projection published.');

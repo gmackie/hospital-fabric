@@ -8,9 +8,9 @@ const sourceSha = execFileSync('git', ['rev-parse', '--verify', 'HEAD'], {encodi
 execFileSync('git', ['diff', '--quiet', 'HEAD', '--', 'apps', 'scripts', 'package.json', 'package-lock.json']);
 if (!/^[a-f0-9]{40}$/.test(sourceSha)) throw new Error('Release requires a Git commit SHA');
 
-const sourceConfig = resolve('apps/worker/wrangler.demo.jsonc');
+const sourceConfig = resolve('apps/worker/wrangler.cloud.jsonc');
 const outputDir = resolve('apps/worker/dist');
-const config = JSON.parse(await readFile(sourceConfig, 'utf8'));
+const config = JSON.parse((await readFile(sourceConfig, 'utf8')).replace(/^\s*\/\/.*$/gm, ''));
 config.main = relative(outputDir, resolve(dirname(sourceConfig), config.main));
 for (const db of config.d1_databases) {
   db.migrations_dir = relative(outputDir, resolve(dirname(sourceConfig), db.migrations_dir));

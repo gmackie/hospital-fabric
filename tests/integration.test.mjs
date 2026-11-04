@@ -520,7 +520,26 @@ test('site and cloud profiles deploy the same bundle with the same bindings (HF-
   assert.deepEqual(bindings(site),bindings(cloud));
   assert.equal(site.routes,undefined,'celld does not support routes');
   assert.equal(site.vars.PUBLIC_DEMO,undefined);
-  assert.deepEqual(cloud.routes,[{pattern:'hospital.gmac.io',custom_domain:true}]);
+  assert.deepEqual(cloud.routes,[{pattern:'hospital.gmac.io',custom_domain:true},{pattern:'med.gmac.io',custom_domain:true}]);
+  assert.equal(cloud.vars.LEGACY_HOSTS,'med.gmac.io');
+  assert.equal(cloud.vars.CANONICAL_ORIGIN,'https://hospital.gmac.io');
+});
+
+test('retired med.gmac.io paths move permanently to hospital.gmac.io; the canonical host is served (HF-13)',async()=>{
+  const {env}=await initialize();
+  const worker=(await import('../apps/worker/dist/index.mjs')).default;
+  try {
+    Object.assign(env,{HF_PROFILE:'cloud',LEGACY_HOSTS:'med.gmac.io',CANONICAL_ORIGIN:'https://hospital.gmac.io'});
+    for (const [method,path] of [['GET','/delivery-lab?x=1'],['POST','/demo/api/start'],['GET','/healthz']]) {
+      const r=await worker.fetch(new Request('https://med.gmac.io'+path,{method}),env);
+      assert.equal(r.status,301);
+      assert.equal(r.headers.get('location'),'https://hospital.gmac.io'+path);
+    }
+    const canonical=await worker.fetch(new Request('https://hospital.gmac.io/healthz'),env);
+    assert.equal(canonical.status,200);
+    delete env.CANONICAL_ORIGIN;
+    assert.equal((await worker.fetch(new Request('https://med.gmac.io/healthz'),env)).status,200,'no redirect without a canonical origin');
+  } finally {env.DB.close();env.LIS_DB.close();}
 });
 
 // HF-13 Phase R: two Workers from the same bundle, a site and a cloud, each with its own D1.

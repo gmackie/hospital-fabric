@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-const base=process.env.HOSPITAL_URL??'https://med.gmac.io';
+const base=process.env.HOSPITAL_URL??'https://hospital.gmac.io';
 async function call(visitor,path,body){const r=await fetch(base+'/hospital/api/'+path,{method:body===undefined?'GET':'POST',headers:{origin:base,cookie:visitor.cookie??'','content-type':'application/json'},body:body===undefined?undefined:JSON.stringify(body)});if(r.headers.has('set-cookie'))visitor.cookie=r.headers.get('set-cookie').split(';')[0];const data=await r.json();assert.equal(r.status,200,JSON.stringify(data));return data;}
 const a={},b={};let state=await call(a,'session',{});await call(b,'session',{});
 assert.equal((await fetch(base+'/hospital')).status,200);assert.equal((await fetch(base+'/delivery-lab')).status,200);
