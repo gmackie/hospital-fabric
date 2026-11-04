@@ -16,6 +16,16 @@ config['vars']['DEMO_API_KEY'] = os.environ['DEMO_API_KEY']
 with open(sys.argv[2], 'w', opener=lambda p, f: os.open(p, f, 0o600)) as out: json.dump(config, out)
 PY
 celld=/opt/hospital-fabric/bin/celld
-"$celld" d1 migrations apply hospital_fabric "$work"
-"$celld" d1 migrations apply hospital_sim_lis "$work"
-"$celld" deploy "$work" --json
+migrate() { "$celld" d1 migrations apply hospital_fabric "$work" && "$celld" d1 migrations apply hospital_sim_lis "$work"; }
+# Schema first, so new code never runs against an older schema.
+if out=$(migrate 2>&1); then
+  echo "$out"
+  "$celld" deploy "$work" --json
+elif grep -q 'no node leases' <<<"$out"; then
+  # A new fleet takes its first lease only once a deployment exists.
+  "$celld" deploy "$work" --json
+  for _ in $(seq 15); do sleep 2; if out=$(migrate 2>&1); then echo "$out"; exit 0; fi; done
+  echo "$out" >&2; exit 1
+else
+  echo "$out" >&2; exit 1
+fi
