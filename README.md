@@ -39,6 +39,16 @@ Every minute the `site` cron drains its referral outbox to `SITE_LINK_URL`, then
 
 Referral delivery uses the dispatcher's lease and fencing discipline (`jobs/site-link.ts`). The cloud stores each idempotency key once, so a delivery whose acknowledgement was lost is retried harmlessly; while the WAN is down the queue grows and drains on reconnect. Every endpoint returns 404 unless `SITE_LINK_SECRET` (at least 32 bytes) is configured. On labnuc `install.sh` generates it into `/etc/hospital-fabric/site-secrets.env` and `deploy.sh` merges it, plus the `FG_COMMIT_HASH` / `FG_BUNDLE_SHA256` release stamp, into the celld vars; on the cloud it is a Worker secret (`wrangler secret put SITE_LINK_SECRET --config apps/worker/wrangler.cloud.jsonc`).
 
+### Site drills (labnuc)
+
+Run as root on labnuc from a release directory. Each one changes only hospital-fabric's own node, bucket and nftables table.
+
+| Drill | Shows | Last passed |
+| --- | --- | --- |
+| `deploy/site/labnuc/restart-drill.sh` | SIGKILLed node restarts under systemd; a lost ACK reconciles with one submit | 2026-11-04 |
+| `deploy/site/labnuc/bucket-restore-drill.sh` | Stopped fleet bucket copied to R2 (`hospital-fabric-site-backup`); a fresh node on the restored copy serves identical operator state | 2026-11-04, 144 objects |
+| `deploy/site/labnuc/wan-cut-drill.sh [SECONDS] [REFERRALS]` | celld egress cut (LAN, bucket and Tailscale kept): lab work continues on site, hospital.gmac.io shows the site offline, and referrals drain exactly once on reconnect | 2026-11-04, 300 s cut, 3 referrals |
+
 ## General live OpenMRS–OpenELIS connector (private research)
 
 The Type 3 work now includes a **generalized real-product laboratory adapter** alongside the existing fixed hemoglobin proof. It supports multiple independently correlated synthetic patients/orders, an installation-reviewed test catalog, actual source/result FHIR stores, versioned laboratory reports, private order/chart-write journals, and a private host CLI for the running OpenMRS/OpenELIS stack. This is not a replacement LIS and does not bypass product accession, QC, or release.
