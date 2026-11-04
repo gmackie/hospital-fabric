@@ -1,6 +1,6 @@
 #!/bin/bash
 set -euo pipefail
-base=/mnt/master-apps/hospital-fabric/bin
+base=${HF_BASE:-/mnt/master-apps/hospital-fabric}/bin
 mkdir -p "$base"
 target="$base/docker-compose-linux-x86_64"
 checksum=a55a8cd4ef103aac282812554e531aac8df7e914a287ee81e14d695556a22902

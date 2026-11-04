@@ -13,6 +13,57 @@ This slice prepares private installations and protocol clients. **It does not co
 
 Private containers and host-generated credentials are now provisioned on `hetzner-master`. See [the host runbook](HETZNER-MASTER.md) for runtime status, pinned images, verification and limitations. The public demo still uses its synthetic simulator.
 
+## labnuc site deployment
+
+HF-13 runs the same private stack on labnuc, the on-site host for hospital.mackie.house, beside the celld site node. It uses the hetzner-master images and scripts. `deploy/real/labnuc/` holds only what differs on labnuc:
+
+| File | Purpose |
+| --- | --- |
+| `host.env` | Host profile (`HF_HOST`, `HF_BASE`, `HF_PRIVATE`, `HF_REQUIRE_MEMORY_LIMITS`) read by the shared `hetzner-master/*` scripts. If these are unset, the scripts keep the hetzner-master paths. |
+| `openmrs.host.yml`, `openelis.host.yml` | Compose overlays: labnuc paths, the same loopback ports as hetzner-master, and a hard memory cap with swap disabled on every service |
+| `images.lock.json` | The same ten AMD64 digests as hetzner-master (a test keeps them identical) |
+| `podman-api.service`, `stack.service` | Installed as `hospital-fabric-podman-api.service` and `hospital-fabric-stack.service`. The API has its own graph root, so labnuc's shared `/var/lib/containers` and its other stacks are untouched. The stack unit retries on failure. |
+| `products.caddy`, `tailnet.sh` | Tailnet-only access to the two authenticated product UIs |
+| `push.sh`, `install.sh`, `run.sh` | Upload from a clean checkout, install as root, and run a shared script with the labnuc profile |
+
+Layout: `/var/lib/hospital-fabric/products/{release,upstream,data,containers,bin}`. Credentials, TLS keys, `common.properties` and sanitized evidence are generated on labnuc into the root-only `/etc/hospital-fabric/products/` and never leave the host. Synthetic patients only.
+
+Deploy from a clean checkout with `node_modules` (to bundle `probe-client.mjs`):
+
+```sh
+deploy/real/labnuc/push.sh
+```
+
+`push.sh` uploads `deploy/real/` at HEAD plus the adapter bundle to `release/`, then runs `install.sh`. That script installs the pinned Compose binary, pulls every pinned image with retries, and runs `prepare-host.py`. Preparation clones and verifies both upstream revisions, generates credentials, installs the units and issues TLS. `install.sh` then installs the Caddy hop and enables and restarts the stack, then publishes the tailnet serves. Rerunning it is idempotent: existing credentials, TLS and data are kept.
+
+Network exposure:
+
+| Address | Reachable from |
+| --- | --- |
+| OpenMRS O3 / REST / FHIR2 `http://127.0.0.1:18090` | labnuc loopback, including the celld Worker on 127.0.0.1:18780 |
+| Order source HAPI `http://127.0.0.1:18093/fhir`, result HAPI `http://127.0.0.1:18091/fhir` | labnuc loopback only (unauthenticated stores; use `ssh -L` for operator access) |
+| OpenELIS UI/API `https://localhost:18443`, HTTP redirect `127.0.0.1:18092` | labnuc loopback |
+| `https://labnuc.tail1e1a32.ts.net:18090` → OpenMRS | tailnet only (`tailscale serve`) |
+| `https://labnuc.tail1e1a32.ts.net:18443` → Caddy `127.0.0.1:18444` → OpenELIS proxy (TLS verified against the host CA) | tailnet only |
+
+Nothing binds the LAN address 10.1.1.188 or a wildcard address. `check-compose.py` still rejects any non-loopback published port. On labnuc it also runs with `--require-memory-limits`, which rejects any service without `mem_limit` or with `memswap_limit` different from it.
+
+Memory budget: the caps total 9.9 GiB (OpenMRS 3.75 GiB, OpenELIS 6.19 GiB). JVM heaps are smaller than on hetzner-master: OpenMRS 1792m, OpenELIS 1408m, and 896m for each HAPI store. labnuc has 27 GB, with about 15 GB available before this stack. The celld node keeps its own 2 GB cap.
+
+Probe and conformance, as root on labnuc:
+
+```sh
+run=/var/lib/hospital-fabric/products/release/deploy/real/labnuc/run.sh
+bash $run probe.mjs
+bash $run conditional-conformance.mjs
+bash $run adapter-conformance.mjs
+bash $run conformance.mjs   # expected to fail: negative test of the rejected PUT strategy
+bash $run verify-openelis-access.py
+bash $run status.py
+```
+
+Evidence is written to `/etc/hospital-fabric/products/*-evidence.json` with `"host": "labnuc"`. Restart with `systemctl restart hospital-fabric-stack.service`. Use `HF_HOST=labnuc HF_BASE=… HF_PRIVATE=… compose.sh <product> …`, or source `host.env`, for single-product operations. Never use `down -v`. The fixture workflow scripts (`openmrs-patient.mjs`, `lab-order.mjs`, accession, result entry and return) still assume hetzner-master paths and have not been run on labnuc. No real OpenELIS adapter is registered in the worker yet.
+
 ## Recommended next implementation path
 
 First reproduce the official integrated demo privately, before expanding the custom bridge. [DIGI-UW/openelis-openmrs-hie](https://github.com/DIGI-UW/openelis-openmrs-hie) includes OpenMRS 3.5.0, OpenELIS 3.2.2.0, Lab on FHIR 1.5.3, seeded LOINC tests and routing configuration. This is the quickest reference for proving registration → Electronic Order → verified result → chart. It uses an additional HAPI shared record/OpenHIM/Mongo stack, including old components; use a disposable isolated synthetic environment, review/pin all images, replace public defaults and expose no public APIs. Its existence is evidence of a configured reference, not proof it boots or is secure today.

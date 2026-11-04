@@ -1,12 +1,12 @@
 /** Exercise the actual adapter against live HAPI with a non-polling synthetic owner. */
 import {randomUUID} from 'node:crypto';
 import {writeFileSync} from 'node:fs';
-const base='/mnt/master-apps/hospital-fabric';
+const base=process.env.HF_BASE??'/mnt/master-apps/hospital-fabric', privateDir=process.env.HF_PRIVATE??base+'/private', host=process.env.HF_HOST??'hetzner-master';
 const {FhirClient,stageOpenElisTask,reconcileOpenElisTask}=await import(base+'/release/probe-client.mjs');
 const client=new FhirClient({baseUrl:'http://127.0.0.1:18093/fhir'});
 const uuid=randomUUID(),id=uuid,ownerId=randomUUID();
 const input={taskId:'task-'+uuid,requestId:'request-'+uuid,patientId:id,ownerId,patientIdentifierSystem:'http://openelis-global.org/pat_nationalId',patientIdentifier:'HF-SYNTH-'+uuid,orderNumber:'HF-SYNTH-'+uuid,loincCode:'718-7',authoredOn:new Date().toISOString()};
-const evidence={checkedAt:new Date().toISOString(),host:'hetzner-master',scope:'actual adapter staging and lost-receipt reconciliation; not lab acceptance',passed:false};
+const evidence={checkedAt:new Date().toISOString(),host,scope:'actual adapter staging and lost-receipt reconciliation; not lab acceptance',passed:false};
 try {
  await client.request('Patient/'+id,'Patient',{method:'PUT',body:{resourceType:'Patient',id,identifier:[{system:input.patientIdentifierSystem,value:input.patientIdentifier}],name:[{family:'Synthetic',given:['Adapter']}],gender:'female',birthDate:'1990-01-01'}});
  await client.request('Practitioner/'+ownerId,'Practitioner',{method:'PUT',body:{resourceType:'Practitioner',id:ownerId}});
@@ -21,5 +21,5 @@ try {
  evidence.passed=true;evidence.taskId=created.taskId;evidence.requestId=created.requestId;
  evidence.checks=['actual builder staged once','conditional replay rejected fresh-creation claim','reconciled exact original IDs and accepted status','Task version unchanged'];
 } catch(error){evidence.error=error.message;process.exitCode=1;}
-writeFileSync(base+'/private/adapter-conformance-evidence.json',JSON.stringify(evidence,null,2)+'\n',{mode:0o600});
+writeFileSync(privateDir+'/adapter-conformance-evidence.json',JSON.stringify(evidence,null,2)+'\n',{mode:0o600});
 console.log(JSON.stringify(evidence,null,2));

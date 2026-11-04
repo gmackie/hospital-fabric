@@ -1,0 +1,21 @@
+[Unit]
+Description=Hospital Fabric isolated Podman API
+RequiresMountsFor=/var/lib/hospital-fabric/products
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+Delegate=yes
+RuntimeDirectory=hospital-fabric
+RuntimeDirectoryMode=0700
+RuntimeDirectoryPreserve=yes
+Environment=XDG_RUNTIME_DIR=/run/hospital-fabric/runtime
+ExecStartPre=/usr/bin/mkdir -p /run/hospital-fabric/runtime
+# Own graph root and runroot: labnuc's shared /var/lib/containers and its other stacks are untouched.
+ExecStart=/usr/bin/podman --root=/var/lib/hospital-fabric/products/containers --runroot=/run/hospital-fabric/storage --runtime=runc system service --time=0 unix:/run/hospital-fabric/podman.sock
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

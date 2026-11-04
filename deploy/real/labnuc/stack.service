@@ -1,0 +1,19 @@
+[Unit]
+Description=Hospital Fabric private OpenMRS and OpenELIS stack
+Requires=hospital-fabric-podman-api.service
+After=hospital-fabric-podman-api.service network-online.target
+RequiresMountsFor=/var/lib/hospital-fabric/products
+# Keep retrying a failed start (for example a slow first image import) instead of giving up.
+StartLimitIntervalSec=0
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+TimeoutStartSec=900
+EnvironmentFile=/var/lib/hospital-fabric/products/release/deploy/real/labnuc/host.env
+ExecStart=/bin/bash /var/lib/hospital-fabric/products/release/deploy/real/hetzner-master/start.sh
+Restart=on-failure
+RestartSec=60
+
+[Install]
+WantedBy=multi-user.target

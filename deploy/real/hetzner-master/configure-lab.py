@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Configure one synthetic hemoglobin fixture via authenticated product APIs."""
-import importlib.util,json,pathlib,re,urllib.request
-base=pathlib.Path('/mnt/master-apps/hospital-fabric')
+import importlib.util,json,os,pathlib,re,urllib.request
+base=pathlib.Path(os.environ.get('HF_BASE','/mnt/master-apps/hospital-fabric'))
+private=pathlib.Path(os.environ.get('HF_PRIVATE',base/'private'))
 spec=importlib.util.spec_from_file_location('access',str(base/'release/deploy/real/hetzner-master/verify-openelis-access.py'))
 a=importlib.util.module_from_spec(spec);spec.loader.exec_module(a)
 # Resolve catalog identity from the installed API instead of assuming a database id.
@@ -24,5 +25,5 @@ if not any(m['source']=='LOINC' and m['code']=='718-7' for m in body['mappings']
 else: updated=body
 if not any(m['source']=='LOINC' and m['code']=='718-7' for m in updated['mappings']): raise RuntimeError('LOINC mapping not confirmed')
 evidence={'testId':test_id,'name':rows[0]['name'],'active':True,'sampleType':'Whole Blood','loinc':'718-7','scope':'synthetic catalog configuration; laboratory import still requires verification'}
-(base/'private/lab-catalog-evidence.json').write_text(json.dumps(evidence,indent=2)+'\n')
+(private/'lab-catalog-evidence.json').write_text(json.dumps(evidence,indent=2)+'\n')
 print(json.dumps(evidence))

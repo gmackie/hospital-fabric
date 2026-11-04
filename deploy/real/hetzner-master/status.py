@@ -2,12 +2,13 @@
 """Report readiness and optional recent container logs, without exposing host secrets."""
 import os,json,pathlib,subprocess,sys,urllib.request
 os.environ['XDG_RUNTIME_DIR']='/run/hospital-fabric/runtime'
-base=pathlib.Path('/mnt/master-apps/hospital-fabric')
+base=pathlib.Path(os.environ.get('HF_BASE','/mnt/master-apps/hospital-fabric'))
+private=pathlib.Path(os.environ.get('HF_PRIVATE',base/'private'))
 podman=['podman','--root='+str(base/'containers'),'--runroot=/run/hospital-fabric/storage','--runtime=runc']
-secrets_path=base/'private/deployment.env'
-private=[line.split('=',1)[1] for line in secrets_path.read_text().splitlines() if 'PASSWORD=' in line] if secrets_path.exists() else []
+secrets_path=private/'deployment.env'
+redacted=[line.split('=',1)[1] for line in secrets_path.read_text().splitlines() if 'PASSWORD=' in line] if secrets_path.exists() else []
 def redact(text):
- for value in private: text=text.replace(value,'[REDACTED]')
+ for value in redacted: text=text.replace(value,'[REDACTED]')
  return text
 if len(sys.argv)>1:
  name=sys.argv[1]

@@ -1,0 +1,28 @@
+# labnuc is a shared homelab host: every service has a hard memory cap and no swap.
+# Loopback ports match hetzner-master; tailnet access is added by tailnet.sh, never the LAN.
+services:
+  gateway:
+    entrypoint: ["/bin/sh", "/hf-gateway.sh"]
+    volumes:
+      - /var/lib/hospital-fabric/products/release/deploy/real/hetzner-master/openmrs-gateway.sh:/hf-gateway.sh:ro
+    ports: !override ["127.0.0.1:18090:80"]
+    mem_limit: 128m
+    memswap_limit: 128m
+  frontend:
+    mem_limit: 128m
+    memswap_limit: 128m
+  backend:
+    mem_limit: 2816m
+    memswap_limit: 2816m
+    cpus: 2
+    environment:
+      OMRS_CONFIG_ADMIN_USER_PASSWORD: ${OMRS_ADMIN_PASSWORD:?Private admin password required}
+      OMRS_JAVA_MEMORY_OPTS: "-Xms256m -Xmx1792m"
+  db:
+    mem_limit: 768m
+    memswap_limit: 768m
+volumes:
+  openmrs-data:
+    driver_opts: {type: none, o: bind, device: /var/lib/hospital-fabric/products/data/openmrs-app}
+  db-data:
+    driver_opts: {type: none, o: bind, device: /var/lib/hospital-fabric/products/data/openmrs-db}
