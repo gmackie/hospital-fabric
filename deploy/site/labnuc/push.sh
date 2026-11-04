@@ -12,5 +12,5 @@ ssh labnuc "sudo install -d -m 0755 $release/dist $release/deploy/site/labnuc &&
 scp -q apps/worker/dist/index.mjs "labnuc:$release/dist/"
 scp -qr apps/worker/migrations apps/worker/wrangler.site.jsonc "labnuc:$release/"
 scp -q deploy/site/labnuc/*.sh deploy/site/labnuc/*.service deploy/site/labnuc/*.caddy "labnuc:$release/deploy/site/labnuc/"
-ssh labnuc "sudo chown -R root:root $release && sudo bash $release/deploy/site/labnuc/install.sh && sudo bash $release/deploy/site/labnuc/deploy.sh $release $digest"
+ssh labnuc "sudo chown -R root:root $release && sudo bash $release/deploy/site/labnuc/install.sh && sudo bash $release/deploy/site/labnuc/deploy.sh $release $digest $commit"
 echo "commit=$commit bundle_sha256=$digest"

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-const base=process.env.HOSPITAL_URL??'https://med.gmac.io';
+const base=process.env.HOSPITAL_URL??'https://hospital.gmac.io';
 const visitor=()=>({cookie:''});
 const a=visitor(),b=visitor();
 async function call(v,path,method='GET',origin=base){

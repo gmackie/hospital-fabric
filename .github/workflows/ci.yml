@@ -25,7 +25,7 @@ jobs:
       - name: Typecheck, bundle and synthetic fault tests
         run: npm run check
       - name: Validate code-only Cloudflare release artifact
-        run: npm run check:demo
+        run: npm run check:cloud
       - name: Smoke test local Wrangler/workerd and D1
         run: npm run smoke:workerd
       - name: Install console test browser

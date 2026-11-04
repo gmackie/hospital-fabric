@@ -1,8 +1,9 @@
-# Public ingress for hospital.mackie.house. The ForgeGraph tunnel connects to this
-# loopback listener; Caddy overwrites both forwarded headers, which is what lets
-# celld run with CELLD_TRUST_FORWARDED_HEADERS=1. Installed as /etc/caddy/conf.d/hospital-fabric.conf.
+# Public ingress for hospital.mackie.house. The ForgeGraph tunnel on labnuc connects to
+# the node's mesh IP (FORGE-312), so listen there and on loopback, never on the LAN IP.
+# Caddy overwrites both forwarded headers, which is what lets celld run with
+# CELLD_TRUST_FORWARDED_HEADERS=1. Installed as /etc/caddy/conf.d/hospital-fabric.conf.
 http://:18782 {
-	bind 127.0.0.1
+	bind 127.0.0.1 100.64.115.45
 	reverse_proxy 127.0.0.1:18780 {
 		header_up X-Forwarded-Proto https
 		header_up X-Forwarded-Host {host}

@@ -7,8 +7,8 @@
   "no_bundle": true,
   "compatibility_date": "2026-10-01",
   "workers_dev": false,
-  "routes": [{ "pattern": "hospital.gmac.io", "custom_domain": true }],
-  "vars": { "HF_PROFILE": "cloud", "ALLOW_DEV_BOOTSTRAP": "0" },
+  "routes": [{ "pattern": "hospital.gmac.io", "custom_domain": true }, { "pattern": "med.gmac.io", "custom_domain": true }],
+  "vars": { "HF_PROFILE": "cloud", "ALLOW_DEV_BOOTSTRAP": "0", "LEGACY_HOSTS": "med.gmac.io", "CANONICAL_ORIGIN": "https://hospital.gmac.io" },
   "d1_databases": [
     { "binding": "DB", "database_name": "hospital-fabric-cloud-core", "database_id": "64d630cc-4385-4519-88ca-d4ed488eeeda", "migrations_dir": "migrations/core" },
     { "binding": "LIS_DB", "database_name": "hospital-fabric-cloud-lis", "database_id": "89fd3be4-d85a-4e48-a676-faf269100677", "migrations_dir": "migrations/sim_lis" }

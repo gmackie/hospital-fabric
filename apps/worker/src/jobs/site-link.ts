@@ -66,7 +66,7 @@ export async function referralQueueDepth(env: Env) {
 export async function sendHeartbeat(env: Env) {
   const unfinished = await env.DB.prepare("SELECT count(*) AS n FROM outbox WHERE state NOT IN ('delivered','blocked')").first<{n:number}>();
   const response = await postSigned(env, '/site-link/v1/heartbeat', {
-    siteId:siteId(env), sentAt:Date.now(), commit:env.HF_COMMIT ?? null,
+    siteId:siteId(env), sentAt:Date.now(), commit:env.FG_COMMIT_HASH ?? null,
     unfinishedDeliveries:unfinished?.n ?? 0, referralQueueDepth:await referralQueueDepth(env),
   });
   await response.body?.cancel();

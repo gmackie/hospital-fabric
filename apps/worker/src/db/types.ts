@@ -20,14 +20,19 @@ export interface Env {
   DB: D1Database;
   LIS_DB: D1Database;
   HF_PROFILE?: string;
+  /** Comma-separated hostnames that 301 to CANONICAL_ORIGIN. */
+  LEGACY_HOSTS?: string;
+  CANONICAL_ORIGIN?: string;
+  /** Release stamp written at deploy time (scripts/prepare-cloud-deploy.mjs, deploy/site/labnuc/deploy.sh). */
+  FG_COMMIT_HASH?: string;
+  FG_BUNDLE_SHA256?: string;
   PUBLIC_DEMO?: string;
   DEMO_RATE_LIMITER?: { limit(input: { key: string }): Promise<{ success: boolean }> };
   DEMO_API_KEY?: string;
   REAL_DEMO_BRIDGE_TOKEN?: string;
   ALLOW_DEV_BOOTSTRAP?: string;
-  /** HF-13 site link: shared HMAC secret (>=32 bytes), cloud base URL, this site's id, deployed commit. */
+  /** HF-13 site link: shared HMAC secret (>=32 bytes), cloud base URL and this site's id. */
   SITE_LINK_SECRET?: string;
   SITE_LINK_URL?: string;
   SITE_ID?: string;
-  HF_COMMIT?: string;
 }
