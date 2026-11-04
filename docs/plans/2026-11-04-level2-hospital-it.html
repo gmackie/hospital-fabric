@@ -1,0 +1,526 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Level 2 hospital IT — Path A plan</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; color: var(--foreground, #202124); font: 14px/1.5 var(--font-sans, system-ui, sans-serif); }
+  main { width: 100%; min-width: 0; }
+  h1 { font-size: 1.25rem; margin: 0 0 .25rem; }
+  h2 { font-size: 1.02rem; margin: 1.75rem 0 .5rem; }
+  h3 { font-size: .9rem; margin: 0 0 .25rem; }
+  p { max-width: 78ch; margin: .5rem 0; }
+  a { color: var(--accent-surface-foreground, #2458ac); }
+  .meta, .muted { color: var(--muted-foreground, #606773); }
+  .small { font-size: .8rem; }
+  :focus-visible { outline: 2px solid var(--ring, #2458ac); outline-offset: 3px; }
+  code, pre { font-family: var(--font-mono, Menlo, Consolas, monospace); font-size: .8em; background: var(--code-background, #f1f3f5); color: var(--code-foreground, #202124); border-radius: 4px; padding: 0 .25em; }
+  .table-scroll { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: .84rem; }
+  th, td { text-align: left; vertical-align: top; padding: .45rem .5rem; border-bottom: 1px solid var(--border, #d8dce2); }
+  th { font-weight: 600; color: var(--muted-foreground, #606773); font-size: .76rem; text-transform: uppercase; letter-spacing: .02em; }
+
+  .badge, .chip { display: inline-block; border-radius: 999px; padding: .08rem .5rem; font-size: .7rem; font-weight: 600; white-space: nowrap; }
+  .badge { background: var(--accent-surface, #eaf0ff); color: var(--accent-surface-foreground, #2458ac); }
+  .chip.done { background: color-mix(in srgb, var(--success, #1e8e3e) 18%, transparent); color: var(--success, #1e8e3e); }
+  .chip.active { background: var(--accent-surface, #eaf0ff); color: var(--accent-surface-foreground, #2458ac); }
+  .chip.todo { background: var(--muted, #f1f3f5); color: var(--muted-foreground, #606773); }
+  .chip.risk, .chip.verify { background: var(--warning-surface, #fff4d6); color: var(--warning-foreground, #7a5200); }
+  .chip.gap { background: var(--destructive-surface, #fde7e7); color: var(--destructive, #b3261e); }
+  .chip.cfg { background: color-mix(in srgb, var(--info, #1967d2) 16%, transparent); color: var(--info, #1967d2); }
+  .chip.build { background: color-mix(in srgb, var(--chart-4, #9334e6) 16%, transparent); color: var(--chart-4, #9334e6); }
+
+  .callout { border-left: 3px solid var(--accent, #2458ac); background: var(--accent-surface, #eaf0ff); color: var(--accent-surface-foreground, #1a2b4d); border-radius: 0 var(--radius, .625rem) var(--radius, .625rem) 0; padding: .65rem .85rem; margin: .75rem 0; }
+  .callout.warn { border-left-color: var(--warning, #b06000); background: var(--warning-surface, #fff4d6); color: var(--warning-foreground, #5c3c00); }
+  .callout p { margin: .25rem 0; }
+
+  .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); gap: .75rem; }
+  .options { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 210px), 1fr)); gap: .75rem; }
+  .card { border: 1px solid var(--border, #d8dce2); border-radius: var(--radius, .625rem); background: var(--card, #f7f8fa); color: var(--card-foreground, #202124); padding: .75rem; min-width: 0; }
+  .card.recommended { border-color: var(--accent, #2458ac); box-shadow: 0 0 0 1px var(--accent, #2458ac); }
+  .card ul { margin: .4rem 0 0; padding-left: 1.1rem; }
+  .card li { margin: .15rem 0; }
+  ul.check, ul.cross { list-style: none; padding-left: 0; }
+  ul.check li::before { content: "✓ "; color: var(--success, #1e8e3e); font-weight: 700; }
+  ul.cross li::before { content: "✕ "; color: var(--destructive, #b3261e); font-weight: 700; }
+
+  /* Architecture stack */
+  .stack { display: grid; gap: 6px; }
+  .layer { display: grid; grid-template-columns: 140px 1fr; gap: 8px; align-items: stretch; }
+  .layer > .lbl { font-size: .74rem; font-weight: 600; color: var(--muted-foreground, #606773); padding: .45rem 0; }
+  .layer > .boxes { display: flex; flex-wrap: wrap; gap: 6px; }
+  .box { border: 1px solid var(--border, #d8dce2); background: var(--card, #f7f8fa); border-radius: 8px; padding: .3rem .55rem; font-size: .78rem; }
+  .box b { font-weight: 600; }
+  .layer.fabric .box { border-color: var(--accent, #2458ac); background: var(--accent-surface, #eaf0ff); color: var(--accent-surface-foreground, #1a2b4d); }
+  .layer.fabric .boxes { border: 1.5px dashed var(--accent, #2458ac); border-radius: 10px; padding: 6px; }
+  @media (max-width: 520px) { .layer { grid-template-columns: 1fr; } .layer > .lbl { padding: .2rem 0 0; } }
+
+  /* Filter bar */
+  .filters { display: flex; flex-wrap: wrap; gap: 6px; margin: .5rem 0; }
+  .filters button { font: inherit; font-size: .76rem; border: 1px solid var(--border, #d8dce2); background: var(--background, #fff); color: var(--foreground, #202124); border-radius: 999px; padding: .15rem .65rem; cursor: pointer; }
+  .filters button[aria-pressed="true"] { background: var(--primary, #2458ac); color: var(--primary-foreground, #fff); border-color: var(--primary, #2458ac); }
+  tr.hide { display: none; }
+
+  .progress { display: flex; gap: 3px; height: 8px; margin: .5rem 0 1rem; }
+  .progress span { flex: 1; border-radius: 3px; background: var(--muted, #e6e8eb); transform-origin: left; }
+  .progress span.done { background: var(--success, #1e8e3e); }
+  .progress span.active { background: var(--accent, #2458ac); }
+
+  .timeline { list-style: none; margin: 0; padding: 0; position: relative; }
+  .timeline::before { content: ""; position: absolute; left: 7px; top: 6px; bottom: 6px; width: 2px; background: var(--border, #d8dce2); }
+  .timeline > li { position: relative; padding: 0 0 1.1rem 1.75rem; }
+  .timeline > li::before { content: ""; position: absolute; left: 0; top: 3px; width: 16px; height: 16px; border-radius: 50%; background: var(--background, #fff); border: 2px solid var(--border, #d8dce2); }
+  .timeline > li.done::before { background: var(--success, #1e8e3e); border-color: var(--success, #1e8e3e); }
+  .timeline > li.active::before { background: var(--accent, #2458ac); border-color: var(--accent, #2458ac); }
+  .timeline .head { display: flex; gap: .5rem; align-items: baseline; flex-wrap: wrap; }
+  .timeline .gate { font-size: .8rem; margin: .3rem 0 0; }
+  .timeline .gate b { color: var(--foreground, #202124); }
+
+  details { border: 1px solid var(--border, #d8dce2); border-radius: var(--radius, .625rem); background: var(--card, #f7f8fa); padding: .5rem .75rem; margin: .5rem 0; }
+  details[open] { padding-bottom: .75rem; }
+  summary { cursor: pointer; font-weight: 600; font-size: .84rem; }
+
+  /* Risk grid */
+  .risk-grid { display: grid; grid-template-columns: 70px repeat(3, 1fr); gap: 4px; font-size: .74rem; }
+  .risk-grid .ax { color: var(--muted-foreground, #606773); display: flex; align-items: center; justify-content: center; text-align: center; font-weight: 600; }
+  .risk-grid .cell { border-radius: 6px; padding: 5px; min-height: 58px; display: flex; flex-wrap: wrap; gap: 4px; align-content: flex-start; background: var(--muted, #f1f3f5); }
+  .risk-grid .cell.h { background: color-mix(in srgb, var(--destructive, #b3261e) 14%, transparent); }
+  .risk-grid .cell.m { background: color-mix(in srgb, var(--warning, #b06000) 14%, transparent); }
+  .risk-grid .cell .chip { background: var(--background, #fff); color: var(--foreground, #202124); border: 1px solid var(--border, #d8dce2); white-space: normal; }
+
+  /* Downtime ladder */
+  .ladder { display: grid; gap: 6px; }
+  .rung { display: grid; grid-template-columns: 170px 1fr 1fr; gap: 8px; border: 1px solid var(--border, #d8dce2); border-radius: 8px; padding: .45rem .6rem; font-size: .8rem; background: var(--card, #f7f8fa); }
+  .rung b { font-size: .82rem; }
+  @media (max-width: 560px) { .rung { grid-template-columns: 1fr; } }
+
+  .sites { display: grid; grid-template-columns: 1fr 70px 1fr; gap: 0; align-items: stretch; }
+  .sites .link { display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: .7rem; color: var(--muted-foreground, #606773); text-align: center; gap: 4px; }
+  .sites .link svg { width: 60px; height: 14px; overflow: visible; }
+  .sites .link path { stroke: var(--accent, #2458ac); stroke-width: 2; fill: none; stroke-dasharray: 6 5; }
+  .sites h3 code { font-size: .75em; }
+  .sites dl { margin: .4rem 0 0; font-size: .8rem; display: grid; grid-template-columns: max-content 1fr; gap: .2rem .6rem; }
+  .sites dt { color: var(--muted-foreground, #606773); }
+  .sites dd { margin: 0; }
+  @media (max-width: 600px) { .sites { grid-template-columns: 1fr; } .sites .link { padding: .4rem 0; display: block; } .sites .link svg, .sites .link br { display: none; } .sites .link::before { content: "↕ "; color: var(--accent, #2458ac); } }
+  .src { font-size: .72rem; color: var(--muted-foreground, #606773); }
+  .decision { border: 1px solid var(--border, #d8dce2); border-left: 3px solid var(--warning, #b06000); border-radius: 0 8px 8px 0; padding: .5rem .7rem; background: var(--card, #f7f8fa); }
+  .decision p { margin: .2rem 0; font-size: .84rem; }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .reveal { animation: rise .45s cubic-bezier(.2,.7,.3,1) both; animation-delay: calc(var(--i, 0) * 60ms); }
+    .progress span { animation: grow .5s ease-out both; animation-delay: calc(250ms + var(--i, 0) * 60ms); }
+    .layer { animation: rise .4s ease-out both; animation-delay: calc(150ms + var(--i, 0) * 90ms); }
+    .timeline > li.active::before { animation: pulse 1.8s ease-in-out infinite; }
+    .sites .link path { animation: flow 1.6s linear infinite; }
+    @keyframes flow { to { stroke-dashoffset: -22; } }
+    @keyframes rise { from { opacity: 0; transform: translateY(6px); } }
+    @keyframes grow { from { transform: scaleX(0); } }
+    @keyframes pulse { 50% { box-shadow: 0 0 0 5px color-mix(in srgb, var(--accent, #2458ac) 25%, transparent); } }
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1 class="reveal">Full IT for a Level 2 hospital: OpenMRS as the EMR, hospital-fabric as the operating layer <span class="badge">Draft v2</span></h1>
+  <p class="meta reveal" style="--i:1">2026-11-04 · gmackie/hospital-fabric @ main (632106f) · Path A on celld · reference demos on labnuc and Cloudflare · issues HF-13 (Phase R), HF-14…HF-22 (Phases 0–8)</p>
+
+  <div class="callout reveal" style="--i:2">
+    <p><strong>Recommendation:</strong> Run the hospital on a pinned set of open-source systems of record (OpenMRS O3, OpenELIS, Orthanc/OHIF, OpenBoxes, an ERP, DHIS2) hosted on site. hospital-fabric is the <em>only</em> component that moves data between them. It also owns capacity, downtime, device and utility visibility.</p>
+    <p>Fill clinical gaps by building OpenMRS modules, never by putting clinical records in hospital-fabric. Nothing touches a real patient until the Phase 1 security work and the Phase 7 downtime exercises pass.</p>
+    <p><strong>Runtime:</strong> hospital-fabric is one Workers-API bundle. At a hospital it runs on a <strong>celld</strong> fleet beside the containerized products. In the cloud the same bundle runs on Cloudflare Workers. The two reference demos are those two roles: <code>hospital.mackie.house</code> on labnuc is the hospital site, and <code>hospital.gmac.io</code> on Cloudflare is the cloud tier.</p>
+  </div>
+
+  <div class="callout warn reveal" style="--i:3">
+    <p><strong>Planning assumption to confirm:</strong> "Level 2" means a WHO-style first-referral or district hospital: emergency care, outpatients, general wards, maternity with caesarean capability, one or two theatres, a small HDU, a general lab with blood transfusion, X-ray and ultrasound, a pharmacy and stores. The design assumes <em>unreliable WAN and power</em>, which is the scenario this repo already models.</p>
+    <p class="small">If you mean a <strong>US Level II trauma center</strong>, OpenMRS is the wrong EMR. ONC certification, HL7v2-heavy device and billing interfaces, and a trauma registry dominate that case, and the plan would change substantially. A <strong>WHO EMT Type 2</strong> field hospital keeps this architecture but swaps the network and power sections for deployable kits.</p>
+  </div>
+
+  <h2 class="reveal" style="--i:4">Scope</h2>
+  <div class="grid2 reveal" style="--i:5">
+    <section class="card"><h3>Goals</h3><ul class="check">
+      <li>Every department has a named system of record and a tested workflow</li>
+      <li>One patient identity across EMR, lab, imaging, pharmacy and billing</li>
+      <li>Clinical work continues on the LAN during WAN loss, and on paper during total IT loss, with tested back-entry</li>
+      <li>Real authentication, role-based access, emergency override, tamper-evident audit</li>
+      <li>Statutory reporting (DHIS2 / HMIS) without manual re-entry</li>
+      <li>Reproducible, signed, offline-installable deployment with tested restore</li>
+    </ul></section>
+    <section class="card"><h3>Non-goals</h3><ul class="cross">
+      <li>Writing a new EMR or storing clinical records in hospital-fabric</li>
+      <li>Writing to another product's database (supported APIs only)</li>
+      <li>Controlling medical devices, pumps, ventilators or alarms</li>
+      <li>Clinical decision support beyond critical-result routing (it would become regulated device software)</li>
+      <li>A second integration engine alongside hospital-fabric for the same flows</li>
+      <li>Cloud dependency for any bedside workflow</li>
+    </ul></section>
+  </div>
+
+  <h2>Two deployments, one bundle</h2>
+  <p class="muted small">Assumed mapping: <code>.mackie.house</code> is the homelab, so it is the site. Both zones already use Cloudflare DNS. <code>hospital.gmac.io</code> currently answers HTTP 522 (a record points at an origin that is down), and <code>hospital.mackie.house</code> times out. Both need new routes.</p>
+  <div class="sites" role="img" aria-label="Site deployment on labnuc at hospital.mackie.house linked by an authenticated outbox to the cloud deployment on Cloudflare at hospital.gmac.io">
+    <section class="card recommended"><h3>Site · <code>hospital.mackie.house</code></h3>
+      <p class="muted small" style="margin:.2rem 0">labnuc: x86-64, Podman 6.1, Caddy and cloudflared already installed</p>
+      <dl>
+        <dt>Runtime</dt><dd>celld node under systemd, <code>celld deploy</code> of the site profile</dd>
+        <dt>Bucket</dt><dd>On-site S3 store on labnuc (not a cloud bucket)</dd>
+        <dt>Products</dt><dd>OpenMRS O3 3.7.1 + OpenELIS 3.2.3.0 in Podman, ported from <code>deploy/real/hetzner-master</code>; Orthanc later</dd>
+        <dt>Adapters</dt><dd>Real, synthetic patients only</dd>
+        <dt>Ingress</dt><dd>Caddy terminates TLS; Cloudflare tunnel for public access; LAN DNS for offline access</dd>
+        <dt>Shows</dt><dd>Real round trips, WAN-cut drill, node kill and restart, downtime snapshots</dd>
+      </dl></section>
+    <div class="link"><svg viewBox="0 0 60 14" aria-hidden="true"><path d="M2 7 H58"/></svg>heartbeat,<br>referrals,<br>backups</div>
+    <section class="card"><h3>Cloud · <code>hospital.gmac.io</code></h3>
+      <p class="muted small" style="margin:.2rem 0">Cloudflare Workers, same account as med.gmac.io</p>
+      <dl>
+        <dt>Runtime</dt><dd>workerd, the cloud profile of the same bundle</dd>
+        <dt>Storage</dt><dd>D1 + Durable Objects; R2 for off-site backups</dd>
+        <dt>Products</dt><dd>None. OpenMRS cannot run on Workers</dd>
+        <dt>Adapters</dt><dd>Simulators, with public visitor sessions as on med.gmac.io</dd>
+        <dt>Ingress</dt><dd>Workers custom domain</dd>
+        <dt>Shows</dt><dd>Public walkthrough, live site status, the referral hub, a regional view</dd>
+      </dl></section>
+  </div>
+
+  <h2>What celld means for the design</h2>
+  <p class="src">From celld docs at v0.6.3 (released 2026-10-21; the repo pins 0.6.2): <code>docs/limitations.md</code>, <code>guarantees.md</code>, <code>cloudflare-compat.md</code>, <code>services/containers.md</code>.</p>
+  <div class="table-scroll"><table>
+    <thead><tr><th>celld behavior</th><th>Design consequence</th></tr></thead>
+    <tbody>
+      <tr><td>Workers, Durable Objects, D1, Queues, Workflows, cron and R2 are supported; Hyperdrive, Cache and <code>tail</code> are not</td><td>One bundle for both runtimes, limited to the shared API set. Both smoke suites (<code>smoke:celld</code>, <code>smoke:workerd</code>) gate every change</td></tr>
+      <tr><td>Exactly one node serves a cell; every activation advances a fencing epoch</td><td>Model each destination connector as one Durable Object cell. That gives single-writer delivery and fencing natively, which <code>PRODUCTION.md</code> item 6 currently lists as open work</td></tr>
+      <tr><td>Node leases live 10 s and renew through the bucket; a node that loses its lease fences itself and exits</td><td><strong>The bucket must be on site.</strong> With R2 as the bucket, a WAN cut stops hospital-fabric within seconds, defeating the offline-first goal</td></tr>
+      <tr><td>Qualified stores are S3, R2, Tigris, GCS and Azure. MinIO passes <code>celld diagnose</code> but is not production-qualified (use RELEASE.2025-09-07 or later)</td><td>The labnuc demo uses pinned MinIO, explicitly labelled unqualified. Qualifying a production on-site store is a tracked Phase 1 risk</td></tr>
+      <tr><td>A single-node fleet waits for the bucket on every write; two or more nodes acknowledge after a peer fsync</td><td>The demo can run on one node. A real site runs 2–3 nodes, and failover can only be shown with a second node (for example gmacko-mini over Tailscale)</td></tr>
+      <tr><td>No TLS; peer traffic is plaintext; the internal operator API is unauthenticated</td><td>Caddy in front; internal listener on Tailscale or a server VLAN, never exposed</td></tr>
+      <tr><td>Containers are experimental with ephemeral disks</td><td>OpenMRS, OpenELIS and their databases stay in Podman under systemd beside celld, not inside it</td></tr>
+      <tr><td>One application per fleet; pre-1.0; some upgrades required stopping the whole fleet</td><td>hospital-fabric is the fleet's only app. Upgrades go through the acceptance suite and a downtime window</td></tr>
+    </tbody>
+  </table></div>
+
+  <h2>Target architecture</h2>
+  <p class="muted small">Everything runs on site. The WAN carries only referrals, national reporting, off-site backup and remote support. The dashed layer is hospital-fabric.</p>
+  <div class="stack" role="img" aria-label="Architecture layers from users and devices down to network and power. Users and devices, clinical systems of record, shared health services, hospital-fabric integration and resilience layer, on-site platform, and network, power and communications.">
+    <div class="layer" style="--i:0"><div class="lbl">Users &amp; endpoints</div><div class="boxes">
+      <span class="box">Clinical workstations</span><span class="box">Ward tablets</span><span class="box">Wristband &amp; label printers</span><span class="box">Barcode scanners</span><span class="box">Operator console</span><span class="box">Downtime print stations</span></div></div>
+    <div class="layer" style="--i:1"><div class="lbl">Systems of record</div><div class="boxes">
+      <span class="box"><b>OpenMRS O3</b> EMR, ADT, queues, orders, notes</span><span class="box"><b>OpenELIS</b> lab, analyzers</span><span class="box"><b>Orthanc + OHIF</b> imaging, worklist</span><span class="box"><b>OpenBoxes</b> stores, lots</span><span class="box"><b>ERP</b> finance, HR, payroll, procurement</span><span class="box"><b>Insurance/claims</b> national scheme</span><span class="box"><b>DHIS2</b> HMIS reporting</span></div></div>
+    <div class="layer" style="--i:2"><div class="lbl">Shared services</div><div class="boxes">
+      <span class="box"><b>Keycloak</b> OIDC / SSO</span><span class="box"><b>Patient index</b> client registry</span><span class="box"><b>OCL / CIEL</b> terminology</span><span class="box"><b>Secrets &amp; PKI</b></span></div></div>
+    <div class="layer fabric" style="--i:3"><div class="lbl">hospital-fabric</div><div class="boxes">
+      <span class="box">Outbox, reconciliation, exception queue</span><span class="box">Hospital events (ADT, order, result)</span><span class="box">Patient links &amp; terminology mappings</span><span class="box">Bed / capacity projections</span><span class="box">Downtime snapshots</span><span class="box">Device passports &amp; gateways</span><span class="box">Utility telemetry</span><span class="box">Referral exchange</span><span class="box">Audit</span></div></div>
+    <div class="layer" style="--i:4"><div class="lbl">On-site platform</div><div class="boxes">
+      <span class="box">2–3 nodes: Podman/systemd for products</span><span class="box">Replicated storage + NAS</span><span class="box"><b>celld fleet</b> hospital-fabric</span><span class="box">On-site S3 bucket</span><span class="box">Offline image &amp; package mirror</span><span class="box">Backups (local + off-site)</span><span class="box">Monitoring &amp; logs</span></div></div>
+    <div class="layer" style="--i:5"><div class="lbl">Network, power, comms</div><div class="boxes">
+      <span class="box">Segmented LAN / Wi-Fi</span><span class="box">Firewall pair, 2 WAN links</span><span class="box">UPS + generator + solar</span><span class="box">Local NTP / DNS</span><span class="box">LAN VoIP + radios (PACE)</span></div></div>
+  </div>
+
+  <h2>Who owns what</h2>
+  <p class="muted small">The rule from <code>docs/FORGE-BOUNDARIES.md</code> extended to the whole hospital: each record has one writer, and hospital-fabric moves it across systems.</p>
+  <div class="table-scroll"><table>
+    <thead><tr><th>Data</th><th>System of record</th><th>What hospital-fabric does</th></tr></thead>
+    <tbody>
+      <tr><td>Patient demographics, identifiers</td><td>OpenMRS + patient index</td><td><code>patient_links</code>; merge/unmerge events go to a person for review</td></tr>
+      <tr><td>Encounters, notes, vitals, problems, allergies</td><td>OpenMRS</td><td>None. Reads only, for downtime snapshots</td></tr>
+      <tr><td>Admissions, transfers, beds</td><td>OpenMRS (ward / bed management)</td><td>Capacity projection; replaces the simulator in <code>hospital/model.ts</code></td></tr>
+      <tr><td>Lab orders, specimens, results</td><td>OpenELIS (results), OpenMRS (orders)</td><td>Outbox delivery, reconciliation, result return, critical-result routing</td></tr>
+      <tr><td>Imaging orders, studies, reports</td><td>OpenMRS (order), Orthanc (study)</td><td>Worklist entry, order-to-study matching (M4)</td></tr>
+      <tr><td>Prescriptions, dispensing</td><td>OpenMRS</td><td>Moves stock between OpenMRS and OpenBoxes</td></tr>
+      <tr><td>Stock, lots, expiry, cold chain</td><td>OpenBoxes</td><td>Lot movements (M5), cold-chain telemetry</td></tr>
+      <tr><td>Charges, invoices, claims</td><td>ERP + insurance system</td><td>Charge events from orders and dispensing</td></tr>
+      <tr><td>Devices, utilities, comms channels</td><td>hospital-fabric (Forge model)</td><td>Owns these: <code>DevicePassport</code>, <code>utility_observations</code>, <code>communications_channels</code></td></tr>
+      <tr><td>Aggregate indicators</td><td>DHIS2</td><td>Scheduled aggregate push with an outbox</td></tr>
+    </tbody>
+  </table></div>
+
+  <h2>Department coverage</h2>
+  <p class="muted small">Status meanings: <span class="chip cfg">Configure</span> exists in the product and needs configuration. <span class="chip build">Build</span> needs an OpenMRS module, form or connector. <span class="chip verify">Verify</span> capability unconfirmed, resolve in the Phase 0 fit-gap. <span class="chip gap">Gap</span> no chosen system yet. Filter by phase:</p>
+  <div class="filters" role="group" aria-label="Filter departments by phase">
+    <button type="button" aria-pressed="true" data-f="all">All</button>
+    <button type="button" aria-pressed="false" data-f="2">P2 Core EMR</button>
+    <button type="button" aria-pressed="false" data-f="3">P3 Diagnostics</button>
+    <button type="button" aria-pressed="false" data-f="4">P4 Medicines</button>
+    <button type="button" aria-pressed="false" data-f="5">P5 Inpatient</button>
+    <button type="button" aria-pressed="false" data-f="6">P6 Admin</button>
+  </div>
+  <div class="table-scroll"><table id="cov">
+    <thead><tr><th>Department</th><th>System</th><th>Key workflows</th><th>Status</th><th>Phase</th></tr></thead>
+    <tbody>
+      <tr data-p="2"><td>Registration &amp; records</td><td>OpenMRS registration + patient index</td><td>Search before create, ID and wristband printing, duplicate review</td><td><span class="chip cfg">Configure</span></td><td>P2</td></tr>
+      <tr data-p="2"><td>Emergency / triage</td><td>OpenMRS queues + forms</td><td>Triage scale form, ED board, ED-to-admit</td><td><span class="chip build">Build</span></td><td>P2</td></tr>
+      <tr data-p="2"><td>Outpatients</td><td>OpenMRS appointments, queues, chart</td><td>Clinic lists, consults, orders, follow-up</td><td><span class="chip cfg">Configure</span></td><td>P2</td></tr>
+      <tr data-p="3"><td>Laboratory</td><td>OpenELIS</td><td>Electronic orders, specimen labels, analyzer import, validation, result return</td><td><span class="chip build">Build</span></td><td>P3</td></tr>
+      <tr data-p="3"><td>Blood bank</td><td>to choose</td><td>Grouping and crossmatch, unit inventory, issue and traceability, reactions</td><td><span class="chip gap">Gap</span></td><td>P3</td></tr>
+      <tr data-p="3"><td>Imaging (X-ray, ultrasound)</td><td>Orthanc + OHIF + worklist</td><td>Order to worklist, study matching, report back to chart</td><td><span class="chip build">Build</span></td><td>P3</td></tr>
+      <tr data-p="4"><td>Pharmacy</td><td>OpenMRS dispensing + OpenBoxes</td><td>Pharmacist verification, dispensing, returns, controlled drugs register</td><td><span class="chip verify">Verify</span></td><td>P4</td></tr>
+      <tr data-p="4"><td>Stores &amp; supply chain</td><td>OpenBoxes</td><td>Requisitions, lots and expiry, ward stock, cold chain</td><td><span class="chip cfg">Configure</span></td><td>P4</td></tr>
+      <tr data-p="4"><td>Medication administration</td><td>OpenMRS ward (eMAR)</td><td>Administration record, barcode check, missed-dose alerts</td><td><span class="chip verify">Verify</span></td><td>P4</td></tr>
+      <tr data-p="5"><td>General wards</td><td>OpenMRS ward app + bed management</td><td>Admit, transfer, nursing charts, handoff, discharge summary</td><td><span class="chip cfg">Configure</span></td><td>P5</td></tr>
+      <tr data-p="5"><td>Maternity</td><td>OpenMRS forms (adopt from existing OpenMRS distributions)</td><td>Antenatal care, partograph, delivery, newborn registration</td><td><span class="chip build">Build</span></td><td>P5</td></tr>
+      <tr data-p="5"><td>Theatre &amp; anaesthesia</td><td>OpenMRS module (to build)</td><td>Theatre list, WHO surgical safety checklist, anaesthesia record, recovery</td><td><span class="chip build">Build</span></td><td>P5</td></tr>
+      <tr data-p="5"><td>HDU / ICU</td><td>OpenMRS flowsheets</td><td>Hourly observations, fluid balance, early-warning score (manual entry first)</td><td><span class="chip build">Build</span></td><td>P5</td></tr>
+      <tr data-p="5"><td>Referrals</td><td>OpenMRS + hospital-fabric referral exchange</td><td>Outbound and inbound referrals, encrypted summaries over WAN</td><td><span class="chip build">Build</span></td><td>P5</td></tr>
+      <tr data-p="6"><td>Billing &amp; cashier</td><td>OpenMRS billing + ERP</td><td>Charge capture, waivers, receipts, end-of-day close</td><td><span class="chip verify">Verify</span></td><td>P6</td></tr>
+      <tr data-p="6"><td>Insurance / claims</td><td>National scheme or openIMIS</td><td>Eligibility, pre-authorization, claims</td><td><span class="chip gap">Gap</span></td><td>P6</td></tr>
+      <tr data-p="6"><td>Finance, procurement, HR, payroll</td><td>ERP (or the government's financial system)</td><td>Ledger, purchase orders, staff records, rostering</td><td><span class="chip gap">Gap</span></td><td>P6</td></tr>
+      <tr data-p="6"><td>Biomedical engineering</td><td>hospital-fabric device passports</td><td>Asset register, preventive maintenance, readiness, recalls</td><td><span class="chip build">Build</span></td><td>P6</td></tr>
+      <tr data-p="6"><td>Management &amp; HMIS reporting</td><td>DHIS2 + reporting warehouse</td><td>Monthly indicators, notifiable diseases, bed occupancy, deaths</td><td><span class="chip build">Build</span></td><td>P6</td></tr>
+      <tr data-p="6"><td>Facilities &amp; utilities</td><td>hospital-fabric telemetry</td><td>Power, generator fuel, oxygen, water, cold rooms</td><td><span class="chip build">Build</span></td><td>P6</td></tr>
+    </tbody>
+  </table></div>
+
+  <h2>Base distribution: decide in Phase 0</h2>
+  <div class="options">
+    <section class="card recommended"><h3>Assemble on the current pins <span class="badge">Recommended</span></h3><ul>
+      <li>Builds on OpenMRS O3 3.7.1 and OpenELIS 3.2.3.0, already deployed and verified on hetzner-master</li>
+      <li>hospital-fabric is the single integration owner, so there is no duplicate-sender risk</li>
+      <li>More configuration and connector work up front</li>
+    </ul></section>
+    <section class="card"><h3>Ozone HIS as the base</h3><ul>
+      <li>Already packages O3 with lab, Orthanc and Odoo ERP</li>
+      <li>Ships its own integration layer, which overlaps hospital-fabric (two senders for the same flow)</li>
+      <li>Worth a two-week evaluation before committing to assembly</li>
+    </ul></section>
+    <section class="card"><h3>Bahmni</h3><ul>
+      <li>Mature in district hospitals, with an Odoo ERP</li>
+      <li>Older user interface and stack, mid-transition</li>
+      <li>Would mean redoing the existing OpenMRS/OpenELIS work</li>
+    </ul></section>
+  </div>
+
+  <h2>Phases</h2>
+  <div class="progress" role="img" aria-label="Prototype groundwork done; Phase 0 and the reference demo track next; 9 more phases">
+    <span class="done" style="--i:0"></span><span class="active" style="--i:1"></span><span class="active" style="--i:1"></span><span style="--i:2"></span><span style="--i:3"></span><span style="--i:4"></span><span style="--i:5"></span><span style="--i:6"></span><span style="--i:7"></span><span style="--i:8"></span><span style="--i:9"></span>
+  </div>
+  <ol class="timeline">
+    <li class="done reveal" style="--i:1"><div class="head"><h3>Groundwork: prototype</h3><span class="chip done">Done</span><span class="muted small">HF-1 to HF-8</span></div>
+      <p class="muted">Outbox with lease, reconciliation after a lost acknowledgment, result intake cursor, a synthetic hemoglobin round trip through real OpenMRS/OpenELIS, the shift simulator, and workerd and celld restart tests. Synthetic data only.</p></li>
+
+    <li class="active reveal" style="--i:2"><div class="head"><h3>Phase 0: Governance, requirements, fit-gap</h3><span class="chip active">Next</span></div>
+      <p class="muted">Turn assumptions into signed decisions before building anything. Every <span class="chip verify">Verify</span> and <span class="chip gap">Gap</span> above gets an answer.</p>
+      <p class="gate"><b>Exit gate:</b> clinical safety lead and data protection lead named, country context fixed, fit-gap signed per department, base distribution chosen.</p>
+      <details><summary>Tasks</summary><div class="table-scroll"><table>
+        <thead><tr><th>Task</th><th>Files</th><th>Verification</th><th>Status</th></tr></thead>
+        <tbody>
+          <tr><td>Confirm "Level 2" definition, country, bed count, departments, national reporting and insurance schemes</td><td><code>docs/LEVEL2-SCOPE.md</code></td><td>Signed scope record</td><td><span class="chip todo">Todo</span></td></tr>
+          <tr><td>Appoint a clinical safety lead; open a hazard log</td><td><code>docs/safety/hazard-log.md</code></td><td>Hazard log reviewed by the clinical lead</td><td><span class="chip todo">Todo</span></td></tr>
+          <tr><td>Department workflow walkthroughs (20 rows above) with clinicians</td><td><code>docs/fit-gap/*.md</code></td><td>Each department signed: configure, build, or out of scope</td><td><span class="chip todo">Todo</span></td></tr>
+          <tr><td>Test O3 3.7.1 for dispensing, eMAR, billing, ward and bed features on hetzner-master</td><td><code>deploy/real/hetzner-master/</code></td><td>Recorded demo of each workflow, or a gap entry</td><td><span class="chip todo">Todo</span></td></tr>
+          <tr><td>Two-week Ozone HIS evaluation against the matrix</td><td><code>docs/adr/0001-base-distribution.md</code></td><td>ADR accepted</td><td><span class="chip todo">Todo</span></td></tr>
+          <tr><td>Threat model and data-protection impact assessment</td><td><code>docs/security/threat-model.md</code></td><td>Reviewed; mitigations mapped to Phase 1 tasks</td><td><span class="chip todo">Todo</span></td></tr>
+          <tr><td>Kanbanger epics per phase under HF</td><td>Kanbanger</td><td>Epics linked to this plan</td><td><span class="chip todo">Todo</span></td></tr>
+        </tbody></table></div></details></li>
+
+    <li class="active reveal" style="--i:3"><div class="head"><h3>Phase R: Dual reference deployment</h3><span class="chip active">Next, alongside Phase 0</span></div>
+      <p class="muted">Synthetic data only, so it doesn't wait for clinical governance. This is the vehicle every later phase ships through: a feature counts as done when it works on both sites.</p>
+      <p class="gate"><b>Exit gate:</b> both hostnames serve the same commit; a WAN cut on labnuc leaves LAN clients working and hospital.gmac.io shows the site offline with queued messages; a killed celld node recovers with no lost or duplicate orders; ForgeGraph records deployment evidence for both.</p>
+      <details><summary>Tasks</summary><div class="table-scroll"><table>
+        <thead><tr><th>Task</th><th>Files</th><th>Verification</th><th>Status</th></tr></thead>
+        <tbody>
+          <tr><td>Deployment profiles: site (celld) and cloud (Workers); adapters chosen from the component registry, not by hostname</td><td><code>apps/worker/wrangler.site.jsonc</code>, <code>wrangler.cloud.jsonc</code>, <code>src/profile.ts</code></td><td>Same bundle hash in both deployments</td><td><span class="chip todo">Todo</span></td></tr>
+          <tr><td>ADR: which state moves into Durable Object cells (connector per destination, ward board, device gateway) and which stays in D1</td><td><code>docs/adr/0006-cells-vs-d1.md</code></td><td>Lost-ack, restart and duplicate suite passes on both runtimes</td><td><span class="chip todo">Todo</span></td></tr>
+          <tr><td>Re-run acceptance on celld 0.6.3; update the pin</td><td><code>scripts/install-validation-tools.py</code></td><td><code>npm run smoke:celld</code> in CI</td><td><span class="chip todo">Todo</span></td></tr>
+          <tr><td>labnuc: pinned MinIO bucket and celld node under systemd; internal listener on Tailscale only</td><td><code>deploy/site/labnuc/</code></td><td><code>celld diagnose</code> passes; restart policy test</td><td><span class="chip todo">Todo</span></td></tr>
+          <tr><td>labnuc: port the OpenMRS/OpenELIS overlays and pinned images from hetzner-master; check the memory budget (27 GB total, about 16 GB free today, shared)</td><td><code>deploy/real/labnuc/</code></td><td>Existing probe and conformance scripts pass on labnuc</td><td><span class="chip todo">Todo</span></td></tr>
+          <tr><td>Ingress: <code>forge route add hospital.mackie.house</code> → labnuc; Caddy TLS; product UIs reachable over Tailscale only</td><td>ForgeGraph routes</td><td>Public probe sees only the hospital-fabric UI</td><td><span class="chip todo">Todo</span></td></tr>
+          <tr><td>Cloud Worker on <code>hospital.gmac.io</code>: replace the stale record; D1 + Durable Objects; simulator adapters; visitor sessions</td><td><code>wrangler.cloud.jsonc</code></td><td><code>scripts/smoke-hospital.mjs</code> against hospital.gmac.io</td><td><span class="chip todo">Todo</span></td></tr>
+          <tr><td>Site-to-cloud link: signed heartbeat and synthetic referrals through the outbox; cloud status page</td><td><code>src/jobs/site-link.ts</code></td><td>24h WAN cut: queue drains exactly once on reconnect</td><td><span class="chip todo">Todo</span></td></tr>
+          <tr><td>Bucket backup: copy the stopped site bucket to R2 and restore it onto a fresh node (extends the HF-4 copied-backup check)</td><td><code>scripts/drills/bucket-restore.mjs</code></td><td>Restored node serves identical state</td><td><span class="chip todo">Todo</span></td></tr>
+          <tr><td>Decide the future of med.gmac.io: keep the delivery lab there or redirect to hospital.gmac.io</td><td><code>docs/CLOUD-DEMO.md</code></td><td>Decision recorded</td><td><span class="chip todo">Todo</span></td></tr>
+          <tr><td>ForgeGraph stages <code>site</code> and <code>cloud</code> with deployment evidence (closes the HF-2 gap)</td><td><code>.forgegraph.yaml</code></td><td><code>forge</code> shows both deployments for the same commit</td><td><span class="chip todo">Todo</span></td></tr>
+        </tbody></table></div></details></li>
+
+    <li class="reveal" style="--i:3"><div class="head"><h3>Phase 1: Platform and security foundation</h3><span class="chip todo">Todo</span><span class="muted small">PRODUCTION.md 1, 2, 3, 10</span></div>
+      <p class="muted">Blocks every other phase. Replace the demo token, make the on-site platform reproducible, and prove that restore works.</p>
+      <p class="gate"><b>Exit gate:</b> no shared tokens; every service behind OIDC; full rebuild from the offline mirror; restore from backup timed and passed; penetration test findings triaged.</p>
+      <details><summary>Tasks</summary><div class="table-scroll"><table>
+        <thead><tr><th>Task</th><th>Files</th><th>Verification</th><th>Status</th></tr></thead>
+        <tbody>
+          <tr><td>Keycloak realm, roles per job (clinician, nurse, lab, pharmacy, cashier, records, operator, admin), MFA for admins</td><td><code>deploy/site/keycloak/</code></td><td>Each product logs in via OIDC; role matrix test</td><td><span class="chip todo">Todo</span></td></tr>
+          <tr><td>Replace <code>x-demo-token</code> with OIDC sessions and service credentials; role and purpose checks</td><td><code>apps/worker/src/api/router.ts</code>, <code>src/auth/*</code></td><td>Integration tests: unauthenticated, wrong role, expired token</td><td><span class="chip todo">Todo</span></td></tr>
+          <tr><td>Emergency access override with reason, time limit and review queue</td><td><code>src/auth/break-glass.ts</code></td><td>Override is logged and appears for next-day review</td><td><span class="chip todo">Todo</span></td></tr>
+          <tr><td>Tamper-evident <code>audit_events</code> (hash chain), including reads of patient data</td><td><code>migrations/core/0007_audit_chain.sql</code></td><td>Chain verification job; edit detection test</td><td><span class="chip todo">Todo</span></td></tr>
+          <tr><td>Site PKI, TLS everywhere, secrets store, key rotation runbook</td><td><code>deploy/site/pki/</code></td><td>No plaintext on the LAN (packet capture check)</td><td><span class="chip todo">Todo</span></td></tr>
+          <tr><td>Production site build: 2–3 celld nodes, Podman/systemd products, a qualified on-site bucket (or a documented risk acceptance)</td><td><code>deploy/site/</code></td><td>Clean install from scratch; ownership failover drill with one node killed</td><td><span class="chip todo">Todo</span></td></tr>
+          <tr><td>Offline mirror of signed images and packages, software bill of materials, pin checker (extends <code>resolve-images.py</code>)</td><td><code>deploy/site/mirror/</code></td><td>Install with WAN unplugged</td><td><span class="chip todo">Todo</span></td></tr>
+          <tr><td>Encrypted backups (local NAS + off-site), restore drills for every database</td><td><code>deploy/site/backup/</code></td><td>Timed restore of each product to a spare node</td><td><span class="chip todo">Todo</span></td></tr>
+          <tr><td>Monitoring, logs without patient data, alerting to on-call</td><td><code>deploy/site/observability/</code></td><td>Synthetic failure raises an alert in under 5 minutes</td><td><span class="chip todo">Todo</span></td></tr>
+          <tr><td>Load test hospital-fabric cells and D1 under celld at projected message volume; record the latency difference between one and three nodes</td><td><code>docs/adr/0002-fabric-storage.md</code></td><td>Load test report</td><td><span class="chip todo">Todo</span></td></tr>
+        </tbody></table></div></details></li>
+
+    <li class="reveal" style="--i:4"><div class="head"><h3>Phase 2: Core EMR, identity, admissions</h3><span class="chip todo">Todo</span><span class="muted small">M1</span></div>
+      <p class="muted">Patients can be registered, queued, seen, admitted and transferred. The simulator's bed model is replaced with real admission, transfer and discharge events.</p>
+      <p class="gate"><b>Exit gate:</b> end-to-end outpatient and emergency-to-admission journeys pass with synthetic patients; duplicate-patient review works; the bed board matches OpenMRS exactly.</p>
+      <details><summary>Tasks</summary><div class="table-scroll"><table>
+        <thead><tr><th>Task</th><th>Files</th><th>Verification</th><th>Status</th></tr></thead>
+        <tbody>
+          <tr><td>OpenMRS configuration as code: locations, wards, beds, roles, forms, CIEL dictionary via OCL</td><td><code>deploy/site/openmrs/config/</code></td><td>Clean install reproduces the configuration</td><td><span class="chip todo">Todo</span></td></tr>
+          <tr><td>Patient index choice and integration; identifier scheme; wristband and label printing</td><td><code>docs/adr/0003-patient-index.md</code></td><td>Duplicate-detection test set</td><td><span class="chip todo">Todo</span></td></tr>
+          <tr><td>Generalize the OpenMRS adapter beyond the fixed synthetic patient (M1), declare its capabilities</td><td><code>src/adapters/real/openmrs.ts</code></td><td>Contract tests against pinned 3.7.1</td><td><span class="chip todo">Todo</span></td></tr>
+          <tr><td>Hospital event intake (admission, transfer, discharge) through outbox and inbox</td><td><code>src/jobs/adt.ts</code>, <code>migrations/core/0008_*</code></td><td>Replay and duplicate tests, as for lab orders</td><td><span class="chip todo">Todo</span></td></tr>
+          <tr><td>Replace the simulated hospital model with real capacity projections</td><td><code>src/hospital/*</code>, <code>apps/hospital/</code></td><td>Projection matches OpenMRS after a restart</td><td><span class="chip todo">Todo</span></td></tr>
+          <tr><td>Patient merge/unmerge goes to a review queue in <code>patient_links</code></td><td><code>src/domain/patient-links.ts</code></td><td>A merge never auto-relinks lab or imaging records</td><td><span class="chip todo">Todo</span></td></tr>
+          <tr><td>Emergency triage form, ED board, outpatient clinic configuration</td><td>OpenMRS forms</td><td>Clinician usability session</td><td><span class="chip todo">Todo</span></td></tr>
+        </tbody></table></div></details></li>
+
+    <li class="reveal" style="--i:5"><div class="head"><h3>Phase 3: Lab, blood bank, imaging</h3><span class="chip todo">Todo</span><span class="muted small">M2, M4, M6 (read-only)</span></div>
+      <p class="muted">Turn the one-test round trip into the full lab and imaging service, including corrections and critical results.</p>
+      <p class="gate"><b>Exit gate:</b> the full test catalogue and panels flow order → specimen → validated result → chart; amended results replace earlier versions correctly; critical results reach a named clinician and are acknowledged; imaging studies always match the right order.</p>
+      <details><summary>Tasks</summary><div class="table-scroll"><table>
+        <thead><tr><th>Task</th><th>Files</th><th>Verification</th><th>Status</th></tr></thead>
+        <tbody>
+          <tr><td>General OpenELIS connector: any approved test or panel, cancellation, rejection, amended results</td><td><code>src/adapters/real/openelis-task.ts</code>, <code>src/jobs/results.ts</code></td><td>Contract suite plus the lost-ack, restart and duplicate suite</td><td><span class="chip todo">Todo</span></td></tr>
+          <tr><td>Versioned LOINC/UCUM mappings with approval workflow</td><td><code>terminology_mappings</code>, <code>src/domain/terminology.ts</code></td><td>Unapproved mapping blocks the order</td><td><span class="chip todo">Todo</span></td></tr>
+          <tr><td>Critical-result routing with escalation and acknowledgment</td><td><code>src/jobs/critical-results.ts</code></td><td>Unacknowledged results escalate on schedule</td><td><span class="chip todo">Todo</span></td></tr>
+          <tr><td>Analyzer interfaces via OpenELIS (per analyzer, read-only)</td><td><code>docs/devices/analyzers.md</code></td><td>Bench test with control samples</td><td><span class="chip todo">Todo</span></td></tr>
+          <tr><td>Blood bank system choice and integration</td><td><code>docs/adr/0004-blood-bank.md</code></td><td>Full traceability from donor unit to recipient</td><td><span class="chip todo">Todo</span></td></tr>
+          <tr><td>Orthanc + OHIF + modality worklist; order-to-study matching (M4)</td><td><code>src/adapters/real/orthanc.ts</code></td><td>Wrong-patient study is never auto-linked</td><td><span class="chip todo">Todo</span></td></tr>
+          <tr><td>Radiology report back to chart</td><td>OpenMRS module</td><td>Report visible on the ordering encounter</td><td><span class="chip todo">Todo</span></td></tr>
+        </tbody></table></div></details></li>
+
+    <li class="reveal" style="--i:6"><div class="head"><h3>Phase 4: Medicines and supply chain</h3><span class="chip todo">Todo</span><span class="muted small">M5</span></div>
+      <p class="muted">Prescribe, verify, dispense, administer and restock, with lot traceability. This is the second-highest clinical-safety area after results.</p>
+      <p class="gate"><b>Exit gate:</b> stock conservation holds across OpenMRS and OpenBoxes after restarts (as the simulator already tests); every administration links to a prescription; controlled-drug register balances.</p>
+      <details><summary>Tasks</summary><div class="table-scroll"><table>
+        <thead><tr><th>Task</th><th>Files</th><th>Verification</th><th>Status</th></tr></thead>
+        <tbody>
+          <tr><td>Medication catalogue (formulary) shared by OpenMRS and OpenBoxes</td><td><code>deploy/site/formulary/</code></td><td>No unmapped dispensable item</td><td><span class="chip todo">Todo</span></td></tr>
+          <tr><td>OpenBoxes connector: lot movements, ward stock, requisitions</td><td><code>src/adapters/real/openboxes.ts</code></td><td>Conservation test across restart and duplicates</td><td><span class="chip todo">Todo</span></td></tr>
+          <tr><td>Pharmacist verification and dispensing (O3 dispensing, or build)</td><td>OpenMRS module</td><td>Pharmacy usability session</td><td><span class="chip todo">Todo</span></td></tr>
+          <tr><td>Medication administration record with barcode checks (configure or build)</td><td>OpenMRS module</td><td>Wrong-patient and wrong-drug scans blocked</td><td><span class="chip todo">Todo</span></td></tr>
+          <tr><td>Cold-chain sensors into <code>utility_observations</code></td><td><code>src/jobs/telemetry.ts</code></td><td>Temperature excursion alerts the pharmacist</td><td><span class="chip todo">Todo</span></td></tr>
+        </tbody></table></div></details></li>
+
+    <li class="reveal" style="--i:7"><div class="head"><h3>Phase 5: Inpatient, theatre, maternity, HDU, referrals</h3><span class="chip todo">Todo</span><span class="muted small">M7 (referrals)</span></div>
+      <p class="muted">The departments with the most custom OpenMRS work. Build as O3 frontend modules plus backend modules, upstreamed where possible.</p>
+      <p class="gate"><b>Exit gate:</b> surgical and maternity journeys pass with clinicians; the surgical safety checklist cannot be skipped; discharge summaries and referrals reach the receiving site after a WAN outage.</p>
+      <details><summary>Tasks</summary><div class="table-scroll"><table>
+        <thead><tr><th>Task</th><th>Files</th><th>Verification</th><th>Status</th></tr></thead>
+        <tbody>
+          <tr><td>Ward app, nursing charts, handoff list, discharge summary</td><td>OpenMRS configuration</td><td>Nurse shift walkthrough</td><td><span class="chip todo">Todo</span></td></tr>
+          <tr><td>Theatre module: list, booking, safety checklist, anaesthesia record, recovery</td><td>new O3 module repository</td><td>Theatre team simulation</td><td><span class="chip todo">Todo</span></td></tr>
+          <tr><td>Maternity: antenatal, partograph, delivery, newborn registration (adopt forms from existing OpenMRS distributions)</td><td>OpenMRS forms</td><td>Midwife walkthrough</td><td><span class="chip todo">Todo</span></td></tr>
+          <tr><td>HDU flowsheets and early-warning score (calculated display only)</td><td>OpenMRS module</td><td>Calculated score matches the hand calculation</td><td><span class="chip todo">Todo</span></td></tr>
+          <tr><td>Encrypted referral exchange with queue-and-forward over WAN</td><td><code>referral_exchanges</code>, <code>src/jobs/referrals.ts</code></td><td>Referral survives 24h WAN loss and arrives exactly once</td><td><span class="chip todo">Todo</span></td></tr>
+        </tbody></table></div></details></li>
+
+    <li class="reveal" style="--i:8"><div class="head"><h3>Phase 6: Billing, ERP, reporting, biomedical, utilities</h3><span class="chip todo">Todo</span></div>
+      <p class="muted">Back-office systems. Most of the work is choosing systems that fit the country's schemes.</p>
+      <p class="gate"><b>Exit gate:</b> a day's charges reconcile to the cashier's close; the monthly DHIS2 report generates with no manual edits; every device in the asset register has a readiness state.</p>
+      <details><summary>Tasks</summary><div class="table-scroll"><table>
+        <thead><tr><th>Task</th><th>Files</th><th>Verification</th><th>Status</th></tr></thead>
+        <tbody>
+          <tr><td>ERP choice (Odoo, ERPNext, or the government's financial system) and integration</td><td><code>docs/adr/0005-erp.md</code></td><td>Purchase-to-pay and payroll test cycle</td><td><span class="chip todo">Todo</span></td></tr>
+          <tr><td>Charge capture from orders and dispensing; cashier; waivers</td><td><code>src/jobs/charges.ts</code></td><td>Charges match services delivered, end of day</td><td><span class="chip todo">Todo</span></td></tr>
+          <tr><td>Insurance eligibility and claims (national scheme or openIMIS)</td><td><code>src/adapters/real/claims.ts</code></td><td>Claim round trip in the scheme's test environment</td><td><span class="chip todo">Todo</span></td></tr>
+          <tr><td>Reporting warehouse and DHIS2 aggregate push</td><td><code>src/jobs/dhis2.ts</code></td><td>Indicators match hand-counted registers for a sample month</td><td><span class="chip todo">Todo</span></td></tr>
+          <tr><td>Forge cutover: facility, component and device models own their tables</td><td><code>forge/src/operations.forge</code></td><td>Gate in <code>FORGE-BOUNDARIES.md</code> passes</td><td><span class="chip todo">Todo</span></td></tr>
+          <tr><td>Biomedical asset register, preventive maintenance, recalls on <code>DevicePassport</code></td><td><code>forge/src/operations.forge</code></td><td>Overdue maintenance shows as not ready</td><td><span class="chip todo">Todo</span></td></tr>
+          <tr><td>Utility telemetry: UPS, generator fuel, oxygen, water</td><td><code>src/jobs/telemetry.ts</code></td><td>Generator start shows on the operator console</td><td><span class="chip todo">Todo</span></td></tr>
+        </tbody></table></div></details></li>
+
+    <li class="reveal" style="--i:9"><div class="head"><h3>Phase 7: Resilience and downtime proof</h3><span class="chip todo">Todo</span><span class="muted small">PRODUCTION.md 6, 9</span></div>
+      <p class="muted">The repo's distinctive capability, proven on real hardware instead of in a model. Runs alongside Phases 2–6 and must pass before go-live.</p>
+      <p class="gate"><b>Exit gate:</b> every failure in the ladder below is exercised on site hardware with clinicians, and back-entry after downtime reconciles to zero discrepancies.</p>
+      <details><summary>Tasks</summary><div class="table-scroll"><table>
+        <thead><tr><th>Task</th><th>Files</th><th>Verification</th><th>Status</th></tr></thead>
+        <tbody>
+          <tr><td>Read-only downtime snapshots per ward: patient list, active meds, allergies, pending results</td><td><code>src/jobs/downtime-snapshot.ts</code></td><td>Snapshot printable from a UPS-backed station with servers off</td><td><span class="chip todo">Todo</span></td></tr>
+          <tr><td>Paper downtime forms and back-entry reconciliation queue</td><td><code>docs/downtime/</code>, operator console</td><td>Back-entry drill with zero lost orders</td><td><span class="chip todo">Todo</span></td></tr>
+          <tr><td>Physical WAN, power and node-loss exercises (extends <code>WEEKEND-ACCEPTANCE.md</code>)</td><td><code>scripts/drills/</code></td><td>Recorded drill evidence</td><td><span class="chip todo">Todo</span></td></tr>
+          <tr><td>Operator exception console for supervised reconciliation (M3)</td><td><code>apps/console/</code></td><td>Each exception type has a resolution path</td><td><span class="chip todo">Todo</span></td></tr>
+          <tr><td>PACE communications plan: LAN VoIP, radios, runners</td><td><code>communications_channels</code></td><td>Comms drill during a simulated outage</td><td><span class="chip todo">Todo</span></td></tr>
+        </tbody></table></div></details></li>
+
+    <li class="reveal" style="--i:10"><div class="head"><h3>Phase 8: Go-live and operations</h3><span class="chip todo">Todo</span><span class="muted small">PRODUCTION.md 8</span></div>
+      <p class="muted">Data migration, training, a phased cutover and a support model that works without the vendor on site.</p>
+      <p class="gate"><b>Exit gate:</b> clinical safety case signed; super-users trained in every department; cutover rehearsed twice; local IT team handles first-line support.</p>
+      <details><summary>Tasks</summary><div class="table-scroll"><table>
+        <thead><tr><th>Task</th><th>Files</th><th>Verification</th><th>Status</th></tr></thead>
+        <tbody>
+          <tr><td>Clinical safety case covering the hazard log</td><td><code>docs/safety/</code></td><td>Signed by the clinical safety lead</td><td><span class="chip todo">Todo</span></td></tr>
+          <tr><td>Legacy data migration (registers, active patients, stock on hand)</td><td><code>scripts/migration/</code></td><td>Sampled record checks against source</td><td><span class="chip todo">Todo</span></td></tr>
+          <tr><td>Training: role-based curriculum, super-users, downtime drills</td><td><code>docs/training/</code></td><td>Competency sign-off per user</td><td><span class="chip todo">Todo</span></td></tr>
+          <tr><td>Phased rollout: registration and outpatients → lab and pharmacy → wards, theatre and maternity → back office</td><td><code>docs/go-live/</code></td><td>Each wave's hypercare exit criteria met</td><td><span class="chip todo">Todo</span></td></tr>
+          <tr><td>Support model: helpdesk, on-call, patch cadence, change board, offline upgrades</td><td><code>docs/operations/</code></td><td>Patch applied from the offline mirror in a maintenance window</td><td><span class="chip todo">Todo</span></td></tr>
+        </tbody></table></div></details></li>
+  </ol>
+
+  <h2>Infrastructure baseline</h2>
+  <div class="grid2">
+    <section class="card"><h3>Network zones</h3><ul>
+      <li><b>Clinical:</b> workstations, tablets, printers</li>
+      <li><b>Servers:</b> on-site cluster; reachable only from clinical and operator zones</li>
+      <li><b>Devices:</b> analyzers, modalities, sensors; isolated, gateway-only</li>
+      <li><b>Admin:</b> finance and HR</li>
+      <li><b>Management:</b> switches, UPS, out-of-band access</li>
+      <li><b>Guest:</b> internet only, never routed inward</li>
+    </ul></section>
+    <section class="card"><h3>Power, time, comms</h3><ul>
+      <li>Online UPS for core switches, servers and downtime print stations; generator and solar transfer tested monthly</li>
+      <li>Local NTP and DNS: WAN loss must not break name resolution, certificates or login</li>
+      <li>Redundant core switching; ward access switches on UPS</li>
+      <li>Two WAN links where available; VPN for remote support and off-site backup</li>
+      <li>LAN VoIP and radios as independent communication paths</li>
+    </ul></section>
+  </div>
+
+  <h2>Downtime ladder</h2>
+  <p class="muted small">What keeps working at each level of failure. Phase 7 has to demonstrate every row.</p>
+  <div class="ladder">
+    <div class="rung"><b>WAN lost</b><span>Everything clinical keeps working on the LAN, because the celld bucket is on site</span><span class="muted">Referrals, DHIS2 and off-site backup queue in the outbox</span></div>
+    <div class="rung"><b>One server node lost</b><span>Services fail over to the remaining nodes</span><span class="muted">Monitoring alerts; runbook restores the node</span></div>
+    <div class="rung"><span><b>One product down</b> (e.g. LIS)</span><span>Other products keep working; orders queue</span><span class="muted">Lab uses paper request forms; exception queue reconciles on recovery</span></div>
+    <div class="rung"><b>Site bucket lost</b><span>celld nodes lose their leases and exit; hospital-fabric stops. Products keep working without integration</span><span class="muted">Restore the bucket from backup; queued work reconciles from product state</span></div>
+    <div class="rung"><b>All servers down</b><span>Printed and UPS-station downtime snapshots</span><span class="muted">Paper forms; back-entry queue after recovery</span></div>
+    <div class="rung"><b>Grid power lost</b><span>UPS bridges to generator and solar</span><span class="muted">Utility telemetry shows fuel and runtime</span></div>
+  </div>
+
+  <h2>Risks</h2>
+  <div class="risk-grid" role="img" aria-label="Risk grid. High likelihood, high impact: wrong-patient results; scope growth. High likelihood, medium impact: O3 feature gaps. Medium likelihood, high impact: untested restore; staff adoption; unqualified on-site bucket; celld pre-1.0 changes. Medium likelihood, medium impact: duplicate integration senders; labnuc capacity. Low likelihood, high impact: security breach.">
+    <div></div><div class="ax">Low impact</div><div class="ax">Medium impact</div><div class="ax">High impact</div>
+    <div class="ax">High</div><div class="cell"></div><div class="cell m"><span class="chip">O3 feature gaps</span></div><div class="cell h"><span class="chip">Wrong-patient results</span><span class="chip">Scope growth</span></div>
+    <div class="ax">Medium</div><div class="cell"></div><div class="cell m"><span class="chip">Two senders, one flow</span><span class="chip">labnuc capacity</span></div><div class="cell h"><span class="chip">Untested restore</span><span class="chip">Staff adoption</span><span class="chip">Unqualified on-site bucket</span><span class="chip">celld pre-1.0 changes</span></div>
+    <div class="ax">Low</div><div class="cell"></div><div class="cell"></div><div class="cell m"><span class="chip">Security breach</span></div>
+  </div>
+  <details><summary>Mitigations</summary>
+    <ul>
+      <li><b>Wrong-patient results:</b> correlate on stable order identifiers only, never on patient alone (already the rule in <code>REAL-SERVICES.md</code>); ambiguous matches go to the exception queue.</li>
+      <li><b>Scope growth:</b> every new department need goes through the fit-gap; non-goals are enforced in review.</li>
+      <li><b>O3 feature gaps:</b> the Phase 0 hands-on test turns unknowns into estimates before committing; upstream modules where possible to share maintenance.</li>
+      <li><b>Untested restore:</b> restore drills are a Phase 1 exit gate and repeat quarterly.</li>
+      <li><b>Staff adoption:</b> clinicians in every walkthrough, super-users per department, phased waves.</li>
+      <li><b>Two senders:</b> one integration owner per flow, recorded in the component registry and checked at startup.</li>
+      <li><b>Unqualified on-site bucket:</b> run <code>celld diagnose</code> on every node start (celld enforces it) and in CI; drill bucket restore; evaluate production on-site stores as a Phase 1 task.</li>
+      <li><b>celld pre-1.0 changes:</b> pin exact releases; re-run the full acceptance suite before upgrading; keep the bundle runnable on workerd as the fallback runtime.</li>
+      <li><b>labnuc capacity:</b> the demo runs OpenMRS and OpenELIS only at first; OpenBoxes, DHIS2 and Orthanc are added one at a time with memory measured, or run on hetzner-master and are labelled "not on site".</li>
+      <li><b>Security breach:</b> threat model, segmented network, OIDC with MFA, audit chain, patch cadence, pen test before go-live.</li>
+    </ul>
+  </details>
+
+  <h2>Open decisions</h2>
+  <div class="grid2">
+    <div class="decision"><p><b>What "Level 2" means here</b></p><p class="muted">Country and tier decide regulation, reporting and insurance. Blocks Phase 0. <b>Owner: you.</b></p></div>
+    <div class="decision"><p><b>Base distribution</b></p><p class="muted">Assemble on current pins vs. Ozone HIS. Recommend assembly, pending a two-week evaluation.</p></div>
+    <div class="decision"><p><b>ERP and insurance</b></p><p class="muted">These depend on the country; the government may require its own financial system.</p></div>
+    <div class="decision"><p><b>Domain mapping</b></p><p class="muted">Assumed: hospital.mackie.house is the labnuc site and hospital.gmac.io is the cloud tier. Swap if you meant the reverse.</p></div>
+    <div class="decision"><p><b>Site bucket</b></p><p class="muted">Recommend pinned MinIO on labnuc for the demo (works offline, unqualified). R2 is qualified but stops the site when the WAN drops.</p></div>
+    <div class="decision"><p><b>Where the products run for the demo</b></p><p class="muted">Recommend porting OpenMRS/OpenELIS to labnuc. Bridging to hetzner-master over Tailscale is less work but breaks the WAN-cut demonstration.</p></div>
+    <div class="decision"><p><b>Second celld node</b></p><p class="muted">Needed to demonstrate ownership failover. gmacko-mini (Apple Silicon, supported) over Tailscale is the cheapest option.</p></div>
+    <div class="decision"><p><b>Pilot site</b></p><p class="muted">A real partner hospital and clinical leads are needed from Phase 0 on. Until then, all work stays synthetic.</p></div>
+  </div>
+
+  <p class="muted small" style="margin-top:1.25rem">Next step: confirm the domain mapping, the site bucket and the Level 2 definition. Then I'll create the HF epics and start Phase R in a worktree.</p>
+</main>
+<script>
+  const buttons = document.querySelectorAll('.filters button');
+  const rows = document.querySelectorAll('#cov tbody tr');
+  buttons.forEach(b => b.addEventListener('click', () => {
+    buttons.forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+    rows.forEach(r => r.classList.toggle('hide', b.dataset.f !== 'all' && r.dataset.p !== b.dataset.f));
+  }));
+</script>
+</body>
+</html>

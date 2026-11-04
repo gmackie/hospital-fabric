@@ -235,7 +235,8 @@ test('an early imported result stays completed after lost-ACK recovery and resta
     assert.equal(replay.status,200,JSON.stringify(replay));
     assert.equal(replay.body.operationId,id);
     const repeated=await call('POST','/v1/admin/tick',undefined,true,restarted);
-    assert.deepEqual(repeated.body.results,{processed:0,skipped:1,quarantined:0});
+    // The persistent intake cursor (HF-8) already passed this result, so the repeat poll does not re-read it.
+    assert.deepEqual(repeated.body.results,{processed:0,skipped:0,quarantined:0});
     const chart=(await call('GET',`/v1/demo/patients/${patient.body.id}/results`)).body.results;
     assert.equal(chart.length,1);
     assert.equal(chart[0].source_report_id,reportId);
