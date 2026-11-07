@@ -1,0 +1,5 @@
+{
+  "host": "https://observe.gmac.io",
+  "project": "hospital-fabric",
+  "wranglerConfig": "apps/worker/wrangler.cloud.jsonc"
+}

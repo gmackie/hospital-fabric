@@ -1,4 +1,4 @@
-import { HOSPITAL_HTML, HOSPITAL_JS, HOSPITAL_CSS } from '../generated/hospital';
+import { HOSPITAL_HTML, HOSPITAL_JS, HOSPITAL_CSS, DATAFLARE_JS } from '../generated/hospital';
 import { hospitalApi } from '../hospital/api';
 import { realDemo } from '../demo/real';
 import { publicDemo } from '../demo/api';
@@ -57,7 +57,9 @@ export async function serve(request:Request,env:Env):Promise<Response> {
     path==='/console.js' ? [CONSOLE_JS,'text/javascript; charset=utf-8'] :
     path==='/console.css' ? [CONSOLE_CSS,'text/css; charset=utf-8'] : null;
   const hospitalAsset = path==='/hospital'||path==='/hospital/'||(path==='/'&&profile.publicDemo) ? [HOSPITAL_HTML,'text/html; charset=utf-8'] : path==='/hospital.js' ? [HOSPITAL_JS,'text/javascript; charset=utf-8'] : path==='/hospital.css' ? [HOSPITAL_CSS,'text/css; charset=utf-8'] : null;
-  if(method==='GET' && hospitalAsset) return new Response(hospitalAsset[0], {headers:{'content-type':hospitalAsset[1]!, 'cache-control':'no-store', 'x-content-type-options':'nosniff', 'referrer-policy':'no-referrer', 'content-security-policy':"default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'"}});
+  if(method==='GET' && hospitalAsset) return new Response(hospitalAsset[0], {headers:{'content-type':hospitalAsset[1]!, 'cache-control':'no-store', 'x-content-type-options':'nosniff', 'referrer-policy':'no-referrer', 'content-security-policy':"default-src 'none'; script-src 'self' https://observe.gmac.io; style-src 'self'; connect-src 'self' https://observe.gmac.io; base-uri 'none'; frame-ancestors 'none'; form-action 'none'"}});
+  // Pageview analytics loader (observe.gmac.io) for the public synthetic demo only; site fleets never load it.
+  if(method==='GET' && path==='/dataflare.js') return profile.publicDemo ? new Response(DATAFLARE_JS,{headers:{'content-type':'text/javascript; charset=utf-8','cache-control':'public, max-age=300','x-content-type-options':'nosniff'}}) : json({code:'not_found'},404);
   if (!profile.operatorConsole && (path==='/console.js' || path==='/console.css')) return json({code:'not_found'},404);
   if (profile.operatorConsole && method==='GET' && asset) return new Response(asset[0], {headers:{
     'content-type':asset[1]!, 'cache-control':'no-store', 'x-content-type-options':'nosniff',

@@ -13,4 +13,6 @@ const hospitalJs = hospital.outputFiles.find(file=>file.path.endsWith('.js'))?.t
 const hospitalCss = hospital.outputFiles.find(file=>file.path.endsWith('.css'))?.text;
 if (!hospitalJs || !hospitalCss) throw new Error('Hospital build did not produce both assets');
 const hospitalHtml = await readFile('apps/hospital/index.html','utf8');
-await writeFile('apps/worker/src/generated/hospital.ts', '// Generated; do not edit.\n'+Object.entries({HOSPITAL_HTML:hospitalHtml,HOSPITAL_JS:hospitalJs,HOSPITAL_CSS:hospitalCss}).map(([name,value])=>`export const ${name} = ${JSON.stringify(value)};`).join('\n')+'\n');
+// Dataflare pageview loader for the public synthetic demo pages (served only in the cloud profile).
+const dataflareJs = await readFile('apps/hospital/dataflare.js','utf8');
+await writeFile('apps/worker/src/generated/hospital.ts', '// Generated; do not edit.\n'+Object.entries({HOSPITAL_HTML:hospitalHtml,HOSPITAL_JS:hospitalJs,HOSPITAL_CSS:hospitalCss,DATAFLARE_JS:dataflareJs}).map(([name,value])=>`export const ${name} = ${JSON.stringify(value)};`).join('\n')+'\n');
