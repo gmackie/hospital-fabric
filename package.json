@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "engines": {
-    "node": ">=22.16.0"
+    "node": "^26.13.1"
   },
   "scripts": {
     "build": "npm run build:console && node scripts/embed-migrations.mjs && esbuild apps/worker/src/index.ts --bundle --format=esm --platform=browser --target=es2022 --outfile=apps/worker/dist/index.mjs",
@@ -29,17 +29,19 @@
     "check:forge": "python3 scripts/check-forge.py"
   },
   "dependencies": {
-    "effect": "4.0.2",
-    "react": "19.2.0",
-    "react-dom": "19.2.0"
+    "effect": "4.1.4",
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
   },
   "devDependencies": {
-    "@playwright/test": "1.56.1",
-    "@types/node": "^22.15.0",
-    "@types/react": "19.2.2",
-    "@types/react-dom": "19.2.2",
-    "esbuild": "^0.25.0",
-    "typescript": "^5.9.3",
-    "wrangler": "^4.0.0"
+    "@playwright/test": "1.65.1",
+    "@types/node": "26.6.6",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "esbuild": "0.28.2",
+    "oxlint": "1.94.0",
+    "oxlint-tsgolint": "7.0.2007",
+    "typescript": "7.0.2",
+    "wrangler": "4.164.0"
   }
 }

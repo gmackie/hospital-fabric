@@ -61,8 +61,8 @@ Private OpenMRS/OpenELIS services now complete a fixed synthetic hemoglobin roun
 
 ## Prerequisites
 
-- Node.js 22.16+ (Effect 4 uses TS >= 5.9; build is ES2022)
-- `npm ci` with network access **before** moving into an air-gapped site (Effect 4 pinned to 4.0.2)
+- Node.js 26.13.1 (TypeScript 7; build target ES2022)
+- `npm ci` with network access **before** moving into an air-gapped site (Effect 4 pinned to 4.1.4)
 - Install [celld](https://celld.dev/docs/) or Wrangler (`npm install` adds local Wrangler) 
 - Local workstation; no internet needed at runtime once dependencies and binary are installed
 
@@ -141,6 +141,6 @@ This application lives at `gmackie/hospital-fabric`. Forge's maintained compiler
 
 ## Verification status
 
-`npm run check` passes SQLite integrity checks, the Effect 4.0.2 typecheck, bundling, and the synthetic integration tests. GitHub Actions also runs `npm run smoke:workerd`: it starts Wrangler locally with two D1 bindings, loses a committed LIS acknowledgment, kills and restarts the runtime using the same persisted databases, reconciles by stable ID, and verifies exactly one LIS order/result plus the final completed operation state. Console Chromium tests cover the synthetic flow and interrupted/repeated interactions. The D1 mock follows workerd's line-oriented `exec` behavior so malformed bootstrap SQL is caught in the integration tests.
+`npm run check` passes SQLite integrity checks, the Effect 4.1.4 typecheck, bundling, and the synthetic integration tests. GitHub Actions also runs `npm run smoke:workerd`: it starts Wrangler locally with two D1 bindings, loses a committed LIS acknowledgment, kills and restarts the runtime using the same persisted databases, reconciles by stable ID, and verifies exactly one LIS order/result plus the final completed operation state. Console Chromium tests cover the synthetic flow and interrupted/repeated interactions. The D1 mock follows workerd's line-oriented `exec` behavior so malformed bootstrap SQL is caught in the integration tests.
 
 The pinned celld 0.6.3 crash/restart smoke (CI, Linux x86-64; 0.6.2 also passed locally on Apple Silicon) and Forge compiler 0.5.0 check/build now pass. Generated SQL is validated in isolation and does not own live tables. See [the weekend acceptance checklist](docs/WEEKEND-ACCEPTANCE.md) for repeatable commands and outstanding physical WAN, backup/restore and ForgeGraph evidence work. Workerd validation does not establish celld compatibility or clinical suitability. The public synthetic demo is deployed separately on Cloudflare; do not use real patient data.
