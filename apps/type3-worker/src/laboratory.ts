@@ -52,10 +52,10 @@ export function intake(input:unknown,order:LabOrder):LabReport {
     const c=fields(v,['code','value','unit']);
     requireThat(typeof c.code==='string' && COMPONENTS[order.test].includes(c.code),'component_mismatch');
     requireThat(c.value==='SYNTHETIC' && c.unit==='demo','synthetic_results_only');
-    return {code:c.code as string,value:'SYNTHETIC',unit:'demo'};
+    return {code:c.code,value:'SYNTHETIC',unit:'demo'};
   }).sort((a,b)=>a.code<b.code?-1:a.code>b.code?1:0);
   requireThat(new Set(components.map(c=>c.code)).size===components.length,'duplicate_component');
-  return {revision,status,critical:o.critical as boolean,components,releasedAt:0,acknowledgedBy:null};
+  return {revision,status,critical:o.critical,components,releasedAt:0,acknowledgedBy:null};
 }
 /** Import the deliberately narrow FHIR R4 synthetic profile exported above.
  * Real-product catalogs, auth and capability discovery remain separate commissioning gates.
@@ -65,6 +65,10 @@ export function fromFhirBundle(value:unknown,order:LabOrder,critical:boolean):La
   requireThat(bundle.resourceType==='Bundle'&&bundle.type==='collection'&&Array.isArray(bundle.entry),'invalid_fhir_bundle');
   requireThat(bundle.entry.length<=16,'fhir_bundle_limit');
   const resources=(bundle.entry as unknown[]).map(e=>fields(e,['resource']).resource).map(r=>fields(r,['resourceType','id'],['status','meta','code','subject','basedOn','specimen','result','valueString']));
+  const resourceRef = (resource: Record<string, unknown>) => {
+    requireThat(typeof resource.resourceType === 'string' && typeof resource.id === 'string', 'invalid_fhir_resource');
+    return resource.resourceType + '/' + resource.id;
+  };
   const reports=resources.filter(r=>r.resourceType==='DiagnosticReport');requireThat(reports.length===1,'one_diagnostic_report_required');
   const report=reports[0]!;const meta=fields(report.meta,['versionId','tag']);
   requireThat(Array.isArray(meta.tag)&&meta.tag.some(v=>{const t=fields(v,['system','code']);return t.system==='urn:hospital-fabric:mode'&&t.code==='synthetic';}),'synthetic_fhir_only');
@@ -77,9 +81,9 @@ export function fromFhirBundle(value:unknown,order:LabOrder,critical:boolean):La
   requireThat(coding(report.code,'urn:hospital-fabric:demo-test')===order.test,'fhir_test_mismatch');
   requireThat(Array.isArray(report.result),'fhir_result_references_required');
   const observations=resources.filter(r=>r.resourceType==='Observation');
-  requireThat(new Set(resources.map(r=>`${r.resourceType}/${r.id}`)).size===resources.length,'duplicate_fhir_resource');
+  requireThat(new Set(resources.map(resourceRef)).size===resources.length,'duplicate_fhir_resource');
   requireThat(resources.length===observations.length+1&&report.result.length===observations.length,'unexpected_fhir_resources');
   const refs=(report.result as unknown[]).map(reference);requireThat(new Set(refs).size===refs.length,'duplicate_fhir_result_reference');
-  const components=refs.map(ref=>{const o=observations.find(o=>`Observation/${o.id}`===ref);requireThat(o,'missing_fhir_observation');requireThat(reference(o.subject)===`Patient/${order.patientId}`&&reference(o.specimen)===`Specimen/${order.specimenId}`,'observation_correlation_mismatch');requireThat(o.status===report.status,'observation_status_mismatch');return {code:coding(o.code,'urn:hospital-fabric:demo-component'),value:o.valueString,unit:'demo'};});
+  const components=refs.map(ref=>{const o=observations.find(o=>resourceRef(o)===ref);requireThat(o,'missing_fhir_observation');requireThat(reference(o.subject)===`Patient/${order.patientId}`&&reference(o.specimen)===`Specimen/${order.specimenId}`,'observation_correlation_mismatch');requireThat(o.status===report.status,'observation_status_mismatch');return {code:coding(o.code,'urn:hospital-fabric:demo-component'),value:o.valueString,unit:'demo'};});
   return intake({orderId:order.id,patientId:order.patientId,specimenId:order.specimenId,test:order.test,revision,status:report.status,critical,components},order);
 }

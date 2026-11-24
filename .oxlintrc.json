@@ -1,0 +1,25 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "options": {
+    "typeAware": true
+  },
+  "categories": {
+    "correctness": "error"
+  },
+  "rules": {
+    "typescript/no-floating-promises": "error",
+    "typescript/no-misused-promises": "error",
+    "typescript/no-unnecessary-type-assertion": "error"
+  },
+  "ignorePatterns": [
+    "apps/worker/src/generated/**",
+    "apps/type3-worker/src/schema.generated.ts",
+    "apps/worker/dist/**",
+    "apps/worker/.wrangler/**",
+    "apps/worker/.celld/**",
+    "node_modules/**",
+    ".validation-tools/**",
+    "test-results/**",
+    "playwright-report/**"
+  ]
+}

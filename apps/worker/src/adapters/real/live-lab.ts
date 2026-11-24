@@ -65,6 +65,12 @@ const object = (value: unknown, what: string): Record<string, unknown> => {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new FhirProtocolError('Invalid ' + what);
   return value as Record<string, unknown>;
 };
+function resourceVersion(meta: unknown, what: string): string {
+  const {versionId} = object(meta, what);
+  if (versionId == null) return '';
+  if (typeof versionId === 'string' || typeof versionId === 'number') return String(versionId);
+  throw new FhirProtocolError('Invalid version in ' + what);
+}
 const entries = (value: unknown, what: string): unknown[] => {
   if (!Array.isArray(value)) throw new FhirProtocolError('Invalid ' + what);
   return value;
@@ -106,7 +112,7 @@ export function validateLiveCatalog(catalog: LabCatalog): void {
 export function testFor(catalog: LabCatalog, key: string): LabCatalogEntry {
   validateLiveCatalog(catalog);
   if (!Object.hasOwn(catalog, key) || !catalog[key]?.enabled) throw new FhirProtocolError('Test not enabled in reviewed local catalog');
-  return catalog[key]!;
+  return catalog[key];
 }
 export function validateLabRequest(catalog: LabCatalog, input: LabRequest, sandbox: boolean): LabCatalogEntry {
   const entry = testFor(catalog, input.testKey);
@@ -270,9 +276,10 @@ export async function readReleasedReports(results: FhirClient, catalog: LabCatal
       if(obs.valueQuantity!==undefined) {
         const quantity=object(obs.valueQuantity,'valueQuantity');
         if(typeof quantity.value!=='number'||!Number.isFinite(quantity.value) ||
+           (quantity.unit != null && typeof quantity.unit !== 'string') ||
            quantity.system!=='http://unitsofmeasure.org'||typeof quantity.code!=='string'||!quantity.code)
            throw new FhirProtocolError('Unsupported numeric result or non-UCUM unit');
-        value={kind:'quantity',value:quantity.value,system:quantity.system,code:quantity.code,unit:String(quantity.unit??quantity.code)};
+        value={kind:'quantity',value:quantity.value,system:quantity.system,code:quantity.code,unit:quantity.unit??quantity.code};
       } else if(typeof obs.valueString==='string'&&obs.valueString.length<=500) {
         value={kind:'text',value:obs.valueString};
       } else if(obs.valueCodeableConcept!==undefined) {
@@ -282,15 +289,15 @@ export async function readReleasedReports(results: FhirClient, catalog: LabCatal
         if(typeof v.system!=='string'||typeof v.code!=='string')throw new FhirProtocolError('Unsupported coded result');
         value={kind:'coded',system:v.system,code:v.code,display:typeof v.display==='string'?v.display:null};
       } else throw new FhirProtocolError('Unsupported laboratory result value; manual review required');
-      processed.push({resourceId:String(obs.id),version:String(object(obs.meta,'observation meta').versionId??''),
-        loinc:String(codes[0]!.code),specimenId:specimenIds[0]!,effectiveDateTime:typeof obs.effectiveDateTime==='string'?obs.effectiveDateTime:null,value});
+      processed.push({resourceId:String(obs.id),version:resourceVersion(obs.meta,'observation meta'),
+        loinc:String(codes[0]!.code),specimenId:specimenIds[0],effectiveDateTime:typeof obs.effectiveDateTime==='string'?obs.effectiveDateTime:null,value});
     }
     // Specimen subject is an independent identity check, not merely a reference label.
     for(const id of specimenIds){
       const specimen=await results.request('Specimen/'+id,'Specimen');
       if(reference(specimen.subject,'specimen subject')!=='Patient/'+input.patientId)throw new FhirProtocolError('Specimen belongs to another patient');
     }
-    output.push({id:report.id,version:String(object(report.meta,'report meta').versionId??''),
+    output.push({id:report.id,version:resourceVersion(report.meta,'report meta'),
       status:report.status as ReleasedReport['status'],patientId:input.patientId,
       orderNumber:input.orderNumber,accessionNumber:accession,testKey:input.testKey,observations:processed});
   }

@@ -16,6 +16,7 @@
     "jsx": "react-jsx"
   },
   "include": [
+    "types/assets.d.ts",
     "apps/worker/src/**/*.ts",
     "apps/console/src/**/*.tsx",
     "apps/console/src/**/*.ts",
