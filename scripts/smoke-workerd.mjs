@@ -167,6 +167,8 @@ export async function runWorkerdSmoke({ celld } = {}) {
     `);
     const config = JSON.parse(readFileSync(join(project, 'wrangler.jsonc'), 'utf8'));
     config.main = 'smoke.mjs';
+    // This scenario advances dispatch explicitly with /v1/admin/tick.
+    config.triggers = { crons: [] };
     writeFileSync(join(project, 'wrangler.jsonc'), JSON.stringify(config));
   }
   const runtimeName = celld ? 'real local celld' : 'real local workerd';
