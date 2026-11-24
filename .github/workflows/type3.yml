@@ -35,8 +35,18 @@ jobs:
         env:
           CELLD_BIN: ${{ github.workspace }}/.validation-tools/bin/celld
           TYPE3_EVIDENCE_PATH: type3-celld-evidence.json
-      - uses: actions/upload-artifact@v4
-        if: always()
+      - name: Upload runtime evidence on Forgejo
+        if: ${{ always() && github.server_url == 'https://git.forgegraf.com' }}
+        uses: actions/upload-artifact@c6a3b2bd78b3985e4b2f15397fec357f0fd808de # v3.2.2-node20
+        with:
+          name: type3-runtime-evidence
+          path: |
+            type3-workerd-evidence.json
+            type3-celld-evidence.json
+          if-no-files-found: warn
+      - name: Upload runtime evidence on GitHub
+        if: ${{ always() && github.server_url == 'https://github.com' }}
+        uses: actions/upload-artifact@v4
         with:
           name: type3-runtime-evidence
           path: |
