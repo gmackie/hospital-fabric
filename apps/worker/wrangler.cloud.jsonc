@@ -5,7 +5,7 @@
   "account_id": "c07a7e704db1808e1fff91bed2b1cd49",
   "main": "dist/index.mjs",
   "no_bundle": true,
-  "compatibility_date": "2026-10-01",
+  "compatibility_date": "2026-11-17",
   "workers_dev": false,
   "routes": [{ "pattern": "hospital.gmac.io", "custom_domain": true }, { "pattern": "med.gmac.io", "custom_domain": true }],
   "vars": { "HF_PROFILE": "cloud", "ALLOW_DEV_BOOTSTRAP": "0", "LEGACY_HOSTS": "med.gmac.io", "CANONICAL_ORIGIN": "https://hospital.gmac.io" },

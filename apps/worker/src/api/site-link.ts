@@ -53,7 +53,7 @@ async function receiveHeartbeat(request: Request, env: Env, secret: string) {
   await env.DB.prepare(`INSERT INTO site_link_heartbeats(site_id,received_at,sent_at,commit_sha,unfinished_deliveries,referral_queue_depth)
     VALUES(?,?,?,?,?,?) ON CONFLICT(site_id) DO UPDATE SET received_at=excluded.received_at,sent_at=excluded.sent_at,
     commit_sha=excluded.commit_sha,unfinished_deliveries=excluded.unfinished_deliveries,referral_queue_depth=excluded.referral_queue_depth`)
-    .bind(b.siteId,Date.now(),sentAt,commit as string | null,b.unfinishedDeliveries,b.referralQueueDepth).run();
+    .bind(b.siteId,Date.now(),sentAt,commit,b.unfinishedDeliveries,b.referralQueueDepth).run();
   return json({accepted:true});
 }
 
@@ -132,7 +132,7 @@ export async function siteLinkOperator(request: Request, env: Env): Promise<Resp
     if ((requestId !== undefined && (typeof requestId !== 'string' || !/^[A-Za-z0-9_.-]{1,80}$/.test(requestId))) ||
       (reason !== undefined && (typeof reason !== 'string' || !REFERRAL_REASONS.includes(reason))))
       throw new ApiError(400,'invalid_input',`Optional requestId and reason (${REFERRAL_REASONS.join(', ')})`);
-    const created = await enqueueSyntheticReferral(env, { requestId, reason } as { requestId?: string; reason?: string });
+    const created = await enqueueSyntheticReferral(env, { requestId, reason });
     return json(created, created.duplicated ? 200 : 201);
   }
   if (method==='GET' && path==='/v1/site-link/referrals') {

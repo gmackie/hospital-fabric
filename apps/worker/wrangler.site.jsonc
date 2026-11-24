@@ -7,7 +7,7 @@
   "name": "hospital-fabric-site",
   "main": "dist/index.mjs",
   "no_bundle": true,
-  "compatibility_date": "2026-10-01",
+  "compatibility_date": "2026-11-17",
   "vars": { "HF_PROFILE": "site", "ALLOW_DEV_BOOTSTRAP": "1", "SITE_ID": "labnuc", "SITE_LINK_URL": "https://hospital.gmac.io" },
   "d1_databases": [
     { "binding": "DB", "database_name": "hospital_fabric", "database_id": "00000000-0000-0000-0000-000000000001", "migrations_dir": "migrations/core" },

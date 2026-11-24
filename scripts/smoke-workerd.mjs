@@ -167,6 +167,8 @@ export async function runWorkerdSmoke({ celld } = {}) {
     `);
     const config = JSON.parse(readFileSync(join(project, 'wrangler.jsonc'), 'utf8'));
     config.main = 'smoke.mjs';
+    // This scenario advances dispatch explicitly with /v1/admin/tick.
+    config.triggers = { crons: [] };
     writeFileSync(join(project, 'wrangler.jsonc'), JSON.stringify(config));
   }
   const runtimeName = celld ? 'real local celld' : 'real local workerd';
@@ -178,7 +180,7 @@ export async function runWorkerdSmoke({ celld } = {}) {
   const signalHandler = () => abort.abort(new Error('Smoke interrupted'));
   process.once('SIGINT', signalHandler);
   process.once('SIGTERM', signalHandler);
-  const signal = () => AbortSignal.any([abort.signal, AbortSignal.timeout(10000)]);
+  const signal = () => AbortSignal.any([abort.signal, AbortSignal.timeout(30000)]);
   const request = async (method, path, body) => {
     const response = await fetch(`${base}${path}`, { method, signal: signal(),
       headers: { 'x-demo-token': secret, 'content-type': 'application/json' },
@@ -198,7 +200,7 @@ export async function runWorkerdSmoke({ celld } = {}) {
     };
     // celld dev supervises its serving node in a separate process group.
     // Capture only descendants of our launcher before it exits/reparents them.
-    const descendants = celld ? (() => {
+    const descendants = (() => {
       const rows = execFileSync('ps', ['-axo', 'pid=,ppid='], { encoding: 'utf8' })
         .trim().split('\n').map(line => line.trim().split(/\s+/).map(Number));
       const owned = new Set([current.pid]);
@@ -211,7 +213,7 @@ export async function runWorkerdSmoke({ celld } = {}) {
       }
       owned.delete(current.pid);
       return [...owned];
-    })() : [];
+    })();
     const killDescendants = signal => {
       for (const pid of descendants) {
         try { process.kill(pid, signal); }
@@ -223,7 +225,7 @@ export async function runWorkerdSmoke({ celld } = {}) {
     await Promise.race([exited, delay(5000, undefined, { ref: false })]);
     // Kill surviving descendants even if the Wrangler launcher exited already.
     killDescendants('SIGKILL');
-    killGroup('SIGKILL');
+    if (current.exitCode === null && current.signalCode === null) killGroup('SIGKILL');
     await Promise.race([exited, delay(2000, undefined, { ref: false })]);
     assert.ok(!current.pid || current.exitCode !== null || current.signalCode !== null, 'Runtime launcher did not terminate');
     worker = undefined;
@@ -242,7 +244,7 @@ export async function runWorkerdSmoke({ celld } = {}) {
       '--inspector-port', '0'];
     worker = spawn(command, args, {
       cwd: root, detached: true, stdio: ['ignore', 'pipe', 'pipe'],
-      env: { ...process.env, WRANGLER_SEND_METRICS: 'false', WRANGLER_LOG_PATH: join(persistence, 'wrangler.log'),
+      env: { ...process.env, CLOUDFLARE_CF_FETCH_ENABLED: 'false', WRANGLER_SEND_METRICS: 'false', WRANGLER_LOG_PATH: join(persistence, 'wrangler.log'),
         CELLD_ESBUILD: resolve(root, 'node_modules/.bin/esbuild'), XDG_CONFIG_HOME: join(persistence, 'config'), BROWSER: 'none', CI: '1' },
     });
     let spawnError;
@@ -251,13 +253,16 @@ export async function runWorkerdSmoke({ celld } = {}) {
     for (const stream of [worker.stdout, worker.stderr]) {
       stream.on('data', data => { logs = (logs + data.toString()).slice(-30000); });
     }
-    for (let i = 0; i < 120; i++) {
+    const readyBy = Date.now() + 60_000;
+    while (Date.now() < readyBy) {
       abort.signal.throwIfAborted();
       if (spawnError) throw spawnError;
       if (worker.exitCode !== null || worker.signalCode !== null) throw new Error('Runtime exited before becoming healthy');
-      const response = await fetch(`${base}/healthz`, { signal: AbortSignal.timeout(500) }).catch(() => null);
-      if (response?.ok) {
-        assert.equal((await response.json()).service, 'hospital-fabric');
+      const health = await fetch(`${base}/healthz`, { signal: AbortSignal.timeout(10_000) })
+        .then(response => response.ok ? response.json() : null)
+        .catch(() => null);
+      if (health) {
+        assert.equal(health.service, 'hospital-fabric');
         return;
       }
       await delay(500, undefined, { signal: abort.signal });

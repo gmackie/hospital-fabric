@@ -11,7 +11,7 @@ npm run check
 npm run smoke:workerd
 ```
 
-Node 22.16+ and Python 3 are required. Dependencies and runtime binaries must be installed before disconnecting WAN. `npm run smoke:workerd` launches temporary local Wrangler/workerd processes with separate, isolated D1 databases. On macOS/Linux it deliberately sends SIGKILL to the runtime process group, verifies HTTP is unavailable, restarts with the same disk state, and checks the SQLite files after stopping the runtime. It does not touch your interactive demo databases. Windows process-group termination is not supported by this harness.
+Node 26.13.1 and Python 3 are required. Dependencies and runtime binaries must be installed before disconnecting WAN. `npm run smoke:workerd` launches temporary local Wrangler/workerd processes with separate, isolated D1 databases. On macOS/Linux it deliberately sends SIGKILL to the runtime process group, verifies HTTP is unavailable, restarts with the same disk state, and checks the SQLite files after stopping the runtime. It does not touch your interactive demo databases. Windows process-group termination is not supported by this harness.
 
 The acceptance assertions are:
 

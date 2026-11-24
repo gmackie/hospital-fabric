@@ -24,6 +24,8 @@ export function fields(value: unknown, required: string[], optional: string[] = 
   return o;
 }
 export function text(value: unknown, max = 80): string {
+  // Reject ASCII control characters in protocol text.
+  // oxlint-disable-next-line no-control-regex
   if (typeof value !== 'string' || !value.length || value.length > max || /[\u0000-\u001f]/.test(value)) throw new ResearchError(400, 'invalid_text', 'Invalid text');
   return value;
 }

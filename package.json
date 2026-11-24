@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "engines": {
-    "node": ">=22.16.0"
+    "node": "^26.13.1"
   },
   "scripts": {
     "build": "npm run build:console && node scripts/embed-migrations.mjs && esbuild apps/worker/src/index.ts --bundle --format=esm --platform=browser --target=es2022 --outfile=apps/worker/dist/index.mjs",
@@ -11,10 +11,11 @@
     "dev:celld": "npm run build && celld dev apps/worker",
     "dev:workerd": "npm run build && wrangler dev --config apps/worker/wrangler.jsonc --local",
     "typecheck": "npm run build:console && node scripts/embed-migrations.mjs && tsc --noEmit",
+    "lint": "oxlint --type-aware --threads=2 apps/worker/src apps/type3-worker/src apps/console/src apps/hospital/src",
     "smoke:workerd": "npm run build && npm run dev:secrets && node scripts/smoke-workerd.mjs",
     "test": "npm run build && node --experimental-sqlite --test tests/*.test.mjs",
     "check:sql": "python3 scripts/check-sql.py",
-    "check": "npm run check:sql && npm run typecheck && npm test",
+    "check": "npm run check:sql && npm run typecheck && npm run lint && npm test",
     "build:console": "node scripts/build-console.mjs",
     "test:console": "npm run build && playwright test",
     "dev:cloud": "npm run build && wrangler dev --config apps/worker/wrangler.cloud.jsonc --local",
@@ -29,17 +30,19 @@
     "check:forge": "python3 scripts/check-forge.py"
   },
   "dependencies": {
-    "effect": "4.0.2",
-    "react": "19.2.0",
-    "react-dom": "19.2.0"
+    "effect": "4.1.4",
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
   },
   "devDependencies": {
-    "@playwright/test": "1.56.1",
-    "@types/node": "^22.15.0",
-    "@types/react": "19.2.2",
-    "@types/react-dom": "19.2.2",
-    "esbuild": "^0.25.0",
-    "typescript": "^5.9.3",
-    "wrangler": "^4.0.0"
+    "@playwright/test": "1.65.1",
+    "@types/node": "26.6.6",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "esbuild": "0.28.2",
+    "oxlint": "1.94.0",
+    "oxlint-tsgolint": "7.0.2007",
+    "typescript": "7.0.2",
+    "wrangler": "4.164.0"
   }
 }

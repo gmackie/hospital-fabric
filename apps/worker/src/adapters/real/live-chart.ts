@@ -1,4 +1,4 @@
-import { FhirClient, FhirProtocolError, type FhirResource } from './fhir-client';
+import { FhirClient, FhirProtocolError } from './fhir-client';
 import type { ReleasedReport, ResultEntry } from './live-lab';
 
 /** Narrow OpenMRS REST bridge for validated numeric results.
@@ -93,7 +93,7 @@ export async function verifyChartConcept(config:ChartConfig,code:string,uuid:str
   if(!Array.isArray(concepts)||concepts.length!==1)throw new FhirProtocolError('Installed concept mapping is ambiguous');
   const concept=object(concepts[0]);
   if(concept.uuid!==uuid||object(concept.datatype).display!=='Numeric'||
-     String(concept.units??'').toLowerCase()!==unit.toLowerCase()||
+     (typeof concept.units === 'string' ? concept.units.toLowerCase() : '')!==unit.toLowerCase()||
      !Array.isArray(concept.mappings)||
      !concept.mappings.some(v=>object(v).display==='LOINC: '+code))
      throw new FhirProtocolError('Installed concept mapping or unit does not match approved mapping');

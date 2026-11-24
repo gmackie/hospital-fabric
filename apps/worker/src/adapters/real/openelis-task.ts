@@ -119,7 +119,7 @@ export async function reconcileOpenElisTask(client: FhirClient, input: Synthetic
         resource?.resourceType !== type || !id(String(resource.id ?? ''))) {
       throw new FhirProtocolError('Synthetic order reconciliation requires exactly one matching request and Task');
     }
-    assigned[type] = String(resource!.id);
+    assigned[type] = String(resource.id);
   }
   const correlated = {...input, requestId: assigned.ServiceRequest!, taskId: assigned.Task!};
   return {...await inspectOpenElisTask(client, correlated), requestId: correlated.requestId, taskId: correlated.taskId};
